@@ -202,8 +202,8 @@ export const styles = StyleSheet.create({
   // 즐겨찾기 버튼 위치 및 스타일
   starBtn: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    bottom: 12,
+    left: 12,
     width: 32,
     height: 32,
     borderRadius: 16,

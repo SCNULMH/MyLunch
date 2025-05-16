@@ -1,3 +1,4 @@
+// App.js
 import React, { useState, useEffect } from 'react';
 import { Linking } from 'react-native';
 import {
@@ -33,11 +34,9 @@ const App = () => {
     return Math.round(R * c);
   };
 
-  // 반응형 맵 높이 계산 (화면 높이의 35%)
   const { height } = useWindowDimensions();
   const mapHeight = height * 0.35;
 
-  // 상태 선언
   const [myPosition, setMyPosition] = useState(null);
   const [radius, setRadius] = useState(2000);
   const [restaurants, setRestaurants] = useState([]);
@@ -55,66 +54,58 @@ const App = () => {
 
   const REST_API_KEY = '25d26859dae2a8cb671074b910e16912';
 
-  // 앱 시작 시 일반 모드로 초기화
+  // 앱 시작 시, 로그인 상태 변경 시 일반 모드로 초기화
+  useEffect(() => setShowBookmarks(false), []);
   useEffect(() => {
-    setShowBookmarks(false);
-  }, []);
-
-  // Firebase Auth 상태 감지 및 북마크 구독
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, currentUser => {
-      setUser(currentUser);
+    const unsub = onAuthStateChanged(auth, u => {
+      setUser(u);
       setShowBookmarks(false);
       setBookmarkSelection(null);
-      if (!currentUser) {
-        setBookmarks({});
-        return;
-      }
-      return subscribeBookmarks(currentUser.uid, data => setBookmarks({ ...data }));
+      if (!u) return setBookmarks({});
+      return subscribeBookmarks(u.uid, data => setBookmarks({ ...data }));
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  // 카카오 API로 근처 식당 조회 (페이징 처리)
   const fetchNearby = async (x, y) => {
     let all = [];
     for (let page = 1; page <= 3; page++) {
       const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${x}&y=${y}&radius=${radius}&page=${page}`;
       const res = await fetch(url, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } });
       if (!res.ok) break;
-      const data = await res.json();
-      if (data.documents?.length) {
-        all.push(...data.documents);
-        if (data.documents.length < 15) break;
+      const js = await res.json();
+      if (js.documents.length) {
+        all.push(...js.documents);
+        if (js.documents.length < 15) break;
       }
     }
     if (all.length) setRestaurants(all);
     else Alert.alert('근처에 식당이 없습니다.');
   };
 
-  // 현위치 기반 검색
   const handleLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return Alert.alert('위치 권한이 필요합니다.');
     const loc = await Location.getCurrentPositionAsync({});
-    const { latitude: lat, longitude: lng } = loc.coords;
-    setMyPosition({ lat, lng });
-    setMapCenter({ lat, lng });
-    fetchNearby(lng, lat);
+    setMyPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+    setMapCenter({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+    fetchNearby(loc.coords.longitude, loc.coords.latitude);
   };
 
-  // 랜덤 추천
   const handleSpin = () => {
     setNoIncludedMessage('');
-    let dataList = showBookmarks && user
+    // 일반 or 북마크 모드별 대상 리스트
+    const dataList = showBookmarks && user
       ? Object.values(bookmarks)
       : restaurants;
-    if (!dataList.length) return Alert.alert(showBookmarks ? '북마크가 없습니다.' : '식당이 없습니다.');
+    if (!dataList.length) {
+      return Alert.alert(showBookmarks ? '북마크가 없습니다.' : '식당이 없습니다.');
+    }
 
-    const excl = excludedCategory.split(',').map(c => c.trim()).filter(Boolean);
+    const excl = excludedCategory.split(',').map(s => s.trim()).filter(Boolean);
     const incl = includedCategory.trim();
     let filtered = dataList.filter(r => {
-      const isEx = excl.some(cat => r.category_name.includes(cat));
+      const isEx = excl.some(c => r.category_name.includes(c));
       const isIn = incl ? r.category_name.includes(incl) : true;
       return !isEx && isIn;
     });
@@ -123,17 +114,14 @@ const App = () => {
       filtered = dataList;
     }
     const result = filtered.sort(() => 0.5 - Math.random()).slice(0, count || 5);
-
     if (showBookmarks && user) setBookmarkSelection(result);
     else setRestaurants(result);
   };
 
-  // 화면에 보여줄 리스트 결정
   const displayData = showBookmarks && user
     ? (bookmarkSelection || Object.values(bookmarks))
     : restaurants;
 
-  // 즐겨찾기 토글
   const toggleBookmark = (id, item) => {
     if (!user) return Alert.alert('로그인이 필요합니다.');
     if (bookmarks[id]) removeBookmark(user.uid, id);
@@ -141,38 +129,39 @@ const App = () => {
     setBookmarkSelection(null);
   };
 
-  // FlatList 아이템 렌더러
   const renderItem = ({ item }) => {
-    const isBookmarked = !!bookmarks[item.id];
+    const isBm = !!bookmarks[item.id];
     const distance = myPosition
       ? calcDistance(
-          myPosition.lat,
-          myPosition.lng,
-          parseFloat(item.y),
-          parseFloat(item.x)
+          myPosition.lat, myPosition.lng,
+          parseFloat(item.y), parseFloat(item.x)
         )
       : item.distance;
     return (
       <View style={styles.cardContainer}>
-        <TouchableOpacity style={[styles.card, isBookmarked && styles.bookmarked]}>  
+        <View style={[styles.card, isBm && styles.bookmarked]}>
+          {/* 북마크 버튼 (왼쪽 아래) */}
           <TouchableOpacity
-            style={[styles.starBtn, isBookmarked && styles.starActive]}
+            style={[styles.starBtn, isBm && styles.starActive]}
             onPress={() => toggleBookmark(item.id, item)}
           >
-            <Text style={isBookmarked ? { color: '#fff' } : {}}>★</Text>
+            <Text style={isBm ? { color: '#fff' } : {}}>★</Text>
           </TouchableOpacity>
+
           <Text style={styles.restaurantTitle}>{item.place_name}</Text>
           <Text style={styles.restaurantMeta}>{item.road_address_name || item.address_name}</Text>
           <Text style={styles.restaurantMeta}>{item.category_name}</Text>
           {item.phone && <Text style={styles.restaurantMeta}>전화: {item.phone}</Text>}
           {distance != null && <Text style={styles.restaurantMeta}>거리: {distance}m</Text>}
+
+          {/* 상세보기 (오른쪽 아래) */}
           <TouchableOpacity
             style={styles.detailBtn}
             onPress={() => Linking.openURL(item.place_url)}
           >
             <Text style={styles.detailText}>상세보기</Text>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -181,12 +170,12 @@ const App = () => {
     <SafeAreaView style={{ flex: 1 }}>
       <FlatList
         data={displayData}
-        keyExtractor={item => String(item.id)}
+        keyExtractor={i => String(i.id)}
         numColumns={2}
         contentContainerStyle={{ padding: 8 }}
         ListHeaderComponent={() => (
           <>
-            {/* 헤더: 타이틀 + 로그인/로그아웃 */}
+            {/* 헤더: 로그인·토글 */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
               {user ? (
@@ -207,6 +196,7 @@ const App = () => {
                 </View>
               )}
             </View>
+
             {/* 모드 토글 */}
             {user && (
               <View style={styles.toggleContainer}>
@@ -214,9 +204,7 @@ const App = () => {
                   style={[styles.toggleBtn, !showBookmarks && styles.toggleActive]}
                   onPress={() => { setShowBookmarks(false); setBookmarkSelection(null); }}
                 >
-                  <Text style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}>
-                    일반 모드
-                  </Text>
+                  <Text style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}>일반 모드</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.toggleBtn, showBookmarks && styles.toggleActive]}
@@ -226,11 +214,19 @@ const App = () => {
                 </TouchableOpacity>
               </View>
             )}
-            {/* 검색 및 랜덤 추천 */}
+
+            {/* 검색 · 필터 · 랜덤 추천 · 반경 */}
             <View style={{ padding: 16 }}>
               <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
                 <Text>현위치 검색</Text>
               </TouchableOpacity>
+              <TextInput
+                style={styles.inputText}
+                placeholder="검색 반경 (m)"
+                keyboardType="numeric"
+                value={radius.toString()}
+                onChangeText={t => setRadius(Number(t) || radius)}
+              />
               <TextInput
                 style={styles.inputText}
                 placeholder="추천 개수"
@@ -255,7 +251,8 @@ const App = () => {
               </TouchableOpacity>
               {noIncludedMessage && <Text style={styles.resultMessage}>{noIncludedMessage}</Text>}
             </View>
-            {/* 지도 영역 */}
+
+            {/* 지도 */}
             <View style={{ width: '100%', height: mapHeight }}>
               <MapComponent
                 style={{ width: '100%', height: '100%' }}
