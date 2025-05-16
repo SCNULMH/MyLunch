@@ -1,74 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Linking,
+  Dimensions,
+} from 'react-native';
 import { addBookmark, removeBookmark, subscribeBookmarks } from '../services/bookmark';
 import { auth } from '../firebase';
+
+const { width } = Dimensions.get('window');
+const CARD_MARGIN = 10;
+const CARD_WIDTH = (width * 0.9) / 2 - CARD_MARGIN * 2;
 
 const RestaurantList = ({ restaurants, onSelect }) => {
   const [bookmarks, setBookmarks] = useState({});
 
   useEffect(() => {
+    // Firebase Auth → 북마크 구독
     const unsubscribeAuth = auth.onAuthStateChanged(user => {
       if (!user) {
         setBookmarks({});
         return;
       }
-
-      const unsubscribeBookmark = subscribeBookmarks(user.uid, (data) => {
+      const unsubscribeBm = subscribeBookmarks(user.uid, data => {
         setBookmarks({ ...data });
       });
-
-      return unsubscribeBookmark;
+      return unsubscribeBm;
     });
-
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
   const toggleBookmark = async (id, item) => {
     const user = auth.currentUser;
     if (!user) return;
-
-    const bookmarkId = String(id);
+    const bid = String(id);
     try {
-      if (bookmarks[bookmarkId]) {
-        await removeBookmark(user.uid, bookmarkId);
+      if (bookmarks[bid]) {
+        await removeBookmark(user.uid, bid);
       } else {
-        await addBookmark(user.uid, { ...item, id: bookmarkId });
+        await addBookmark(user.uid, { ...item, id: bid });
       }
-    } catch (error) {
-      console.error("북마크 토글 실패:", error);
+    } catch (e) {
+      console.error(e);
     }
   };
 
   const renderItem = ({ item }) => {
-    const bookmarkId = String(item.id);
-    const isBookmarked = !!bookmarks[bookmarkId];
+    const bid = String(item.id);
+    const isBookmarked = !!bookmarks[bid];
 
     return (
-      <TouchableOpacity style={styles.card} onPress={() => onSelect(item)}>
+      <View style={styles.cardContainer}>
         <TouchableOpacity
-          style={[styles.bookmarkBtn, isBookmarked && styles.bookmarked]}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            toggleBookmark(item.id, item);
-          }}
+          style={[styles.card, isBookmarked && styles.bookmarked]}
+          onPress={() => onSelect(item)}
         >
-          <Text style={styles.star}>★</Text>
-        </TouchableOpacity>
+          {/* 북마크 ★ 버튼 */}
+          <TouchableOpacity
+            style={[styles.starBtn, isBookmarked && styles.starActive]}
+            onPress={e => {
+              e.stopPropagation?.();
+              toggleBookmark(item.id, item);
+            }}
+          >
+            <Text style={[styles.star, isBookmarked && { color: '#fff' }]}>★</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.title}>{item.place_name}</Text>
-        <Text style={styles.meta}>{item.road_address_name || item.address_name}</Text>
-        <Text style={styles.meta}>{item.category_name}</Text>
-        {item.phone && <Text style={styles.meta}>전화: {item.phone}</Text>}
-        {item.distance && <Text style={styles.meta}>거리: {item.distance}m</Text>}
-        <TouchableOpacity
-          onPress={() => Linking.openURL(item.place_url)}
-          style={styles.detailBtn}
-        >
-          <Text style={styles.detailText}>상세보기</Text>
+          {/* 가게 이름 */}
+          <Text style={styles.title}>{item.place_name}</Text>
+
+          {/* 메타 정보 */}
+          <Text style={styles.meta}>{item.road_address_name || item.address_name}</Text>
+          <Text style={styles.meta}>{item.category_name}</Text>
+          {item.phone && <Text style={styles.meta}>전화: {item.phone}</Text>}
+          {item.distance != null && <Text style={styles.meta}>거리: {item.distance}m</Text>}
+
+          {/* 상세보기 */}
+          <TouchableOpacity
+            style={styles.detailBtn}
+            onPress={() => Linking.openURL(item.place_url)}
+          >
+            <Text style={styles.detailText}>상세보기</Text>
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -84,60 +102,92 @@ const RestaurantList = ({ restaurants, onSelect }) => {
     <FlatList
       data={restaurants}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id.toString()}
+      keyExtractor={item => String(item.id)}
+      numColumns={2}
+      contentContainerStyle={styles.listContainer}
     />
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 10,
-    borderRadius: 8,
-    elevation: 2,
-    marginHorizontal: 10,
+  listContainer: {
+    paddingHorizontal: CARD_MARGIN,
   },
-  bookmarkBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
+  cardContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 8,
+    margin: CARD_MARGIN,
+  },
+  card: {
+    width: CARD_WIDTH,
+    backgroundColor: '#fff',
+    borderRadius: 32,
+    padding: 22,
+    // iOS 그림자
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    // Android
+    elevation: 4,
+    position: 'relative',
   },
   bookmarked: {
+    borderWidth: 2,
+    borderColor: '#FFD600', // 노란 테두리 유지
+  },
+  starBtn: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#DDD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  starActive: {
     backgroundColor: '#FFD600',
+    borderColor: '#FFD600',
   },
   star: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#222',
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#111',
+    marginTop: 8,
+    marginBottom: 12,
+    paddingLeft: 4,
   },
   meta: {
     fontSize: 14,
     color: '#555',
-    marginTop: 2,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   detailBtn: {
-    marginTop: 10,
-    backgroundColor: '#2196F3',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
+    marginTop: 12,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    alignSelf: 'flex-end',
   },
   detailText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: 'bold',
   },
   emptyBox: {
     padding: 30,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   emptyText: {
     color: '#888',

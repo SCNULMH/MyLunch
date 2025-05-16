@@ -23,6 +23,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 20,
     marginBottom: 24,
   },
@@ -163,9 +164,106 @@ export const styles = StyleSheet.create({
     marginTop: 12,
     padding: 10,
     backgroundColor: '#4CAF50',
-    color: '#fff',
     borderRadius: 14,
-    fontSize: 16,
     alignSelf: 'flex-end',
+  },
+  detailText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  // 그리드 아이템 컨테이너
+  cardContainer: {
+    flex: 1,
+    padding: 8,
+  },
+  // 개별 카드 스타일
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    margin: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  // 북마크 표시(카드 테두리)
+  bookmarked: {
+    borderColor: '#FFD600',
+    borderWidth: 2,
+  },
+  // 즐겨찾기 버튼 위치 및 스타일
+  starBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#DDD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  starActive: {
+    backgroundColor: '#FFD600',
+    borderColor: '#FFD600',
+  },
+  // 모드 토글 버튼
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  toggleBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#f4f4f4',
+    marginHorizontal: 8,
+  },
+  toggleActive: {
+    backgroundColor: '#43A047',
+  },
+  toggleText: {
+    fontSize: 14,
+    color: '#555',
+  },
+  toggleTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+});
+export const stylesNative = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 32,
+    paddingBottom: 28,
+    alignItems: 'center',
+    marginVertical: 40,
+    width: '95%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    elevation: 8,
+  },
+  mapArea: {
+    width: '90%',
+    height: 220,
+    backgroundColor: '#eafbe7',
+    borderRadius: 28,
+    marginVertical: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 22,
   },
 });
