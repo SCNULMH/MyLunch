@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, Alert, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import * as Location from 'expo-location';
 import MapComponent from './components/MapComponent';
 import RestaurantList from './components/RestaurantList';
@@ -8,11 +8,11 @@ import AuthModal from './components/AuthModal';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { subscribeBookmarks, addBookmark, removeBookmark } from './services/bookmark';
+import { styles } from './styles/styles_native';
 
 const App = () => {
   const [myPosition, setMyPosition] = useState(null);
   const [radius, setRadius] = useState(2000);
-  const [address, setAddress] = useState('');
   const [restaurants, setRestaurants] = useState([]);
   const [count, setCount] = useState(0);
   const [excludedCategory, setExcludedCategory] = useState('');
@@ -28,6 +28,7 @@ const App = () => {
 
   const REST_API_KEY = '25d26859dae2a8cb671074b910e16912';
 
+  // Firebase Auth 및 북마크 구독
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -42,63 +43,50 @@ const App = () => {
 
   const toggleBookmark = (id, item) => {
     if (!user) return Alert.alert('로그인이 필요합니다.');
-    if (bookmarks[id]) {
-      removeBookmark(user.uid, id);
-    } else {
-      addBookmark(user.uid, id, item);
-    }
+    if (bookmarks[id]) removeBookmark(user.uid, id);
+    else addBookmark(user.uid, id, item);
     setBookmarkRandomSelection(null);
   };
 
+  // 위치 기반 식당 조회
   const fetchNearbyRestaurants = async (x, y) => {
-    let allRestaurants = [];
+    let all = [];
     for (let page = 1; page <= 3; page++) {
-      const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=\uC2DD\uB2F9&x=${x}&y=${y}&radius=${radius}&page=${page}`;
-      const response = await fetch(url, {
-        headers: { Authorization: `KakaoAK ${REST_API_KEY}` }
-      });
-      if (!response.ok) break;
-      const data = await response.json();
+      const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${x}&y=${y}&radius=${radius}&page=${page}`;
+      const res = await fetch(url, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } });
+      if (!res.ok) break;
+      const data = await res.json();
       if (data.documents?.length) {
-        allRestaurants = [...allRestaurants, ...data.documents];
+        all = [...all, ...data.documents];
         if (data.documents.length < 15) break;
       }
     }
-    if (allRestaurants.length === 0) {
-      Alert.alert('근처에 식당이 없습니다.');
-    }
-    setRestaurants(allRestaurants);
+    if (!all.length) return Alert.alert('근처에 식당이 없습니다.');
+    setRestaurants(all);
   };
 
   const handleLocationClick = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('위치 권한이 필요합니다.');
-      return;
-    }
-    const location = await Location.getCurrentPositionAsync({});
-    const lat = location.coords.latitude;
-    const lng = location.coords.longitude;
-    setMyPosition({ lat, lng });
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('위치 권한이 필요합니다.');
+    const loc = await Location.getCurrentPositionAsync({});
+    const { latitude: lat, longitude: lng } = loc.coords;
     setMapCenter({ lat, lng });
+    setMyPosition({ lat, lng });
     fetchNearbyRestaurants(lng, lat);
   };
 
   const handleSpin = () => {
     const dataList = isBookmarkMode ? Object.values(bookmarks) : restaurants;
-    if (dataList.length === 0) {
-      Alert.alert(isBookmarkMode ? '북마크가 없습니다.' : '식당이 없습니다.');
-      return;
-    }
+    if (!dataList.length) return Alert.alert(isBookmarkMode ? '북마크가 없습니다.' : '식당이 없습니다.');
     const excluded = excludedCategory.split(',').map(c => c.trim()).filter(Boolean);
     const included = includedCategory.trim();
     const filtered = dataList.filter(r => {
-      const isExcluded = excluded.length > 0 && excluded.some(cat => r.category_name.includes(cat));
+      const isExcluded = excluded.some(cat => r.category_name.includes(cat));
       const isIncluded = included ? r.category_name.includes(included) : true;
       return !isExcluded && isIncluded;
     });
-    const finalList = filtered.length ? filtered : dataList.filter(r => !excluded.some(cat => r.category_name.includes(cat)));
     if (!filtered.length && included) setNoIncludedMessage(`${included} 관련 음식점 없음. 전체에서 추천합니다.`);
+    const finalList = filtered.length ? filtered : dataList.filter(r => !excluded.some(cat => r.category_name.includes(cat)));
     const result = finalList.sort(() => 0.5 - Math.random()).slice(0, count || 5);
     if (isBookmarkMode) setBookmarkRandomSelection(result);
     else setRestaurants(result);
@@ -107,52 +95,64 @@ const App = () => {
   const displayRestaurants = isBookmarkMode ? (bookmarkRandomSelection || Object.values(bookmarks)) : restaurants;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>오늘 뭐 먹지?</Text>
+        <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
         {user ? (
-          <View>
-            <Text>환영합니다 {user.displayName}님!</Text>
-            <Button title={isBookmarkMode ? '일반 모드' : '북마크 모드'} onPress={() => setIsBookmarkMode(!isBookmarkMode)} />
-            <Button title="로그아웃" onPress={() => signOut(auth)} />
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={styles.welcomeMsg}>환영합니다 {user.displayName}님!</Text>
+            <TouchableOpacity style={styles.authButton} onPress={() => setIsBookmarkMode(!isBookmarkMode)}>
+              <Text>{isBookmarkMode ? '일반 모드' : '북마크 모드'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutBtn} onPress={() => signOut(auth)}>
+              <Text>로그아웃</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <View>
-            <Button title="로그인" onPress={() => { setAuthMode('login'); setAuthModalOpen(true); }} />
-            <Button title="회원가입" onPress={() => { setAuthMode('signup'); setAuthModalOpen(true); }} />
+          <View style={{ flexDirection: 'row' }}>
+            <TouchableOpacity style={styles.authButton} onPress={() => { setAuthMode('login'); setAuthModalOpen(true); }}>
+              <Text>로그인</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.authButton} onPress={() => { setAuthMode('signup'); setAuthModalOpen(true); }}>
+              <Text>회원가입</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
 
-      <Button title="현위치로 검색" onPress={handleLocationClick} />
+      <TouchableOpacity style={styles.commonButton} onPress={handleLocationClick}>
+        <Text>현위치로 검색</Text>
+      </TouchableOpacity>
 
       <RadiusInput setRadius={setRadius} />
 
       <TextInput
-        style={styles.input}
+        style={styles.inputText}
         placeholder="추천 개수"
         keyboardType="numeric"
         value={count.toString()}
-        onChangeText={(text) => setCount(Number(text) || 0)}
+        onChangeText={text => setCount(Number(text) || 0)}
       />
 
       <TextInput
-        style={styles.input}
+        style={styles.inputText}
         placeholder="추천할 카테고리 (예: 한식)"
         value={includedCategory}
         onChangeText={setIncludedCategory}
       />
 
       <TextInput
-        style={styles.input}
+        style={styles.inputText}
         placeholder="제외할 카테고리 (쉼표로 구분)"
         value={excludedCategory}
         onChangeText={setExcludedCategory}
       />
 
-      <Button title="랜덤 추천" onPress={handleSpin} />
+      <TouchableOpacity style={styles.randomButton} onPress={handleSpin}>
+        <Text>랜덤 추천</Text>
+      </TouchableOpacity>
 
-      {noIncludedMessage && <Text style={{ color: 'red' }}>{noIncludedMessage}</Text>}
+      {noIncludedMessage && <Text style={styles.resultMessage}>{noIncludedMessage}</Text>}
 
       <MapComponent
         mapCenter={mapCenter}
@@ -164,7 +164,7 @@ const App = () => {
 
       <RestaurantList
         restaurants={displayRestaurants}
-        onSelect={() => {}}
+        onSelect={() => {} }
         bookmarks={bookmarks}
         toggleBookmark={toggleBookmark}
       />
@@ -177,26 +177,5 @@ const App = () => {
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  header: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 8,
-    marginBottom: 10,
-    borderRadius: 4,
-  },
-});
 
 export default App;
