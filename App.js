@@ -1,15 +1,17 @@
 // App.js
-import React, { useState, useEffect } from 'react';
-import { Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import {
-  SafeAreaView,
   View,
   Text,
+  SafeAreaView,
   TextInput,
   TouchableOpacity,
   Alert,
   useWindowDimensions,
   FlatList,
+  Linking
 } from 'react-native';
 import * as Location from 'expo-location';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -19,21 +21,28 @@ import AuthModal from './components/AuthModal';
 import { subscribeBookmarks, addBookmark, removeBookmark } from './services/bookmark';
 import { styles } from './styles/styles_native';
 
-const App = () => {
-  // 거리 계산 헬퍼 (Haversine)
-  const calcDistance = (lat1, lon1, lat2, lon2) => {
-    const toRad = x => (x * Math.PI) / 180;
-    const R = 6371000; // 지구 반지름 (m)
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c);
-  };
+// 앱 런치 시 스플래시 자동 숨김 방지
+SplashScreen.preventAutoHideAsync();
 
+export default function App() {
+  // ─── 1) 커스텀 폰트 로드
+  const [fontsLoaded] = useFonts({
+    CustomFont: require('./assets/fonts/font.ttf'),
+  });
+
+  // ─── 2) 폰트 로딩 완료 시 스플래시 숨김
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  // ─── 3) 로딩 전엔 아무것도 렌더하지 않음
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  // ─── 4) 기타 훅 (순서 변경 금지) ───
   const { height } = useWindowDimensions();
   const mapHeight = height * 0.35;
 
@@ -52,26 +61,48 @@ const App = () => {
   const [noIncludedMessage, setNoIncludedMessage] = useState('');
   const [showBookmarks, setShowBookmarks] = useState(false);
 
-  const REST_API_KEY = '25d26859dae2a8cb671074b910e16912';
-
-  // 앱 시작 시, 로그인 상태 변경 시 일반 모드로 초기화
-  useEffect(() => setShowBookmarks(false), []);
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => {
-      setUser(u);
+    setShowBookmarks(false);
+  }, []);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, currentUser => {
+      setUser(currentUser);
       setShowBookmarks(false);
       setBookmarkSelection(null);
-      if (!u) return setBookmarks({});
-      return subscribeBookmarks(u.uid, data => setBookmarks({ ...data }));
+      if (!currentUser) {
+        setBookmarks({});
+        return;
+      }
+      return subscribeBookmarks(currentUser.uid, data => setBookmarks({ ...data }));
     });
     return () => unsub();
   }, []);
 
+  // ─── 헬퍼: 거리 계산 (Haversine) ───
+  const calcDistance = (lat1, lon1, lat2, lon2) => {
+    const toRad = x => (x * Math.PI) / 180;
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c);
+  };
+
+  const REST_API_KEY = '25d26859dae2a8cb671074b910e16912';
+
+  // ─── 카카오 API: 근처 식당 조회 ───
   const fetchNearby = async (x, y) => {
     let all = [];
     for (let page = 1; page <= 3; page++) {
-      const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${x}&y=${y}&radius=${radius}&page=${page}`;
-      const res = await fetch(url, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } });
+      const res = await fetch(
+        `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${x}&y=${y}&radius=${radius}&page=${page}`,
+        { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
+      );
       if (!res.ok) break;
       const js = await res.json();
       if (js.documents.length) {
@@ -83,78 +114,84 @@ const App = () => {
     else Alert.alert('근처에 식당이 없습니다.');
   };
 
+  // ─── 현위치 검색 ───
   const handleLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return Alert.alert('위치 권한이 필요합니다.');
+    if (status !== 'granted') {
+      Alert.alert('위치 권한이 필요합니다.');
+      return;
+    }
     const loc = await Location.getCurrentPositionAsync({});
-    setMyPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-    setMapCenter({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-    fetchNearby(loc.coords.longitude, loc.coords.latitude);
+    const { latitude: lat, longitude: lng } = loc.coords;
+    setMyPosition({ lat, lng });
+    setMapCenter({ lat, lng });
+    fetchNearby(lng, lat);
   };
 
+  // ─── 랜덤 추천 ───
   const handleSpin = () => {
     setNoIncludedMessage('');
-    // 일반 or 북마크 모드별 대상 리스트
-    const dataList = showBookmarks && user
-      ? Object.values(bookmarks)
-      : restaurants;
-    if (!dataList.length) {
-      return Alert.alert(showBookmarks ? '북마크가 없습니다.' : '식당이 없습니다.');
+    const list = showBookmarks && user ? Object.values(bookmarks) : restaurants;
+    if (!list.length) {
+      Alert.alert(showBookmarks ? '북마크가 없습니다.' : '식당이 없습니다.');
+      return;
     }
-
     const excl = excludedCategory.split(',').map(s => s.trim()).filter(Boolean);
     const incl = includedCategory.trim();
-    let filtered = dataList.filter(r => {
+    let filtered = list.filter(r => {
       const isEx = excl.some(c => r.category_name.includes(c));
       const isIn = incl ? r.category_name.includes(incl) : true;
       return !isEx && isIn;
     });
     if (!filtered.length && incl) {
       setNoIncludedMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
-      filtered = dataList;
+      filtered = list;
     }
     const result = filtered.sort(() => 0.5 - Math.random()).slice(0, count || 5);
     if (showBookmarks && user) setBookmarkSelection(result);
     else setRestaurants(result);
   };
 
+  // ─── 토글별 화면 데이터 ───
   const displayData = showBookmarks && user
     ? (bookmarkSelection || Object.values(bookmarks))
     : restaurants;
 
+  // ─── 북마크 토글 ───
   const toggleBookmark = (id, item) => {
-    if (!user) return Alert.alert('로그인이 필요합니다.');
+    if (!user) {
+      Alert.alert('로그인이 필요합니다.');
+      return;
+    }
     if (bookmarks[id]) removeBookmark(user.uid, id);
     else addBookmark(user.uid, id, item);
     setBookmarkSelection(null);
   };
 
+  // ─── FlatList 렌더러 ───
   const renderItem = ({ item }) => {
     const isBm = !!bookmarks[item.id];
-    const distance = myPosition
-      ? calcDistance(
-          myPosition.lat, myPosition.lng,
-          parseFloat(item.y), parseFloat(item.x)
-        )
+    const dist = myPosition
+      ? calcDistance(myPosition.lat, myPosition.lng, parseFloat(item.y), parseFloat(item.x))
       : item.distance;
     return (
       <View style={styles.cardContainer}>
         <View style={[styles.card, isBm && styles.bookmarked]}>
-          {/* 북마크 버튼 (왼쪽 아래) */}
           <TouchableOpacity
             style={[styles.starBtn, isBm && styles.starActive]}
             onPress={() => toggleBookmark(item.id, item)}
           >
             <Text style={isBm ? { color: '#fff' } : {}}>★</Text>
           </TouchableOpacity>
-
-          <Text style={styles.restaurantTitle}>{item.place_name}</Text>
-          <Text style={styles.restaurantMeta}>{item.road_address_name || item.address_name}</Text>
+          <Text style={[styles.restaurantTitle, { fontFamily: 'CustomFont' }]}>
+            {item.place_name}
+          </Text>
+          <Text style={styles.restaurantMeta}>
+            {item.road_address_name || item.address_name}
+          </Text>
           <Text style={styles.restaurantMeta}>{item.category_name}</Text>
           {item.phone && <Text style={styles.restaurantMeta}>전화: {item.phone}</Text>}
-          {distance != null && <Text style={styles.restaurantMeta}>거리: {distance}m</Text>}
-
-          {/* 상세보기 (오른쪽 아래) */}
+          {dist != null && <Text style={styles.restaurantMeta}>거리: {dist}m</Text>}
           <TouchableOpacity
             style={styles.detailBtn}
             onPress={() => Linking.openURL(item.place_url)}
@@ -166,6 +203,7 @@ const App = () => {
     );
   };
 
+  // ─── UI 렌더링 ───
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <FlatList
@@ -175,22 +213,33 @@ const App = () => {
         contentContainerStyle={{ padding: 8 }}
         ListHeaderComponent={() => (
           <>
-            {/* 헤더: 로그인·토글 */}
+            {/* 헤더 */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
+              <Text style={[styles.headerTitle, { fontFamily: 'CustomFont' }]}>
+                오늘 뭐 먹지?
+              </Text>
               {user ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                   <Text style={styles.welcomeMsg}>{user.displayName}님 환영!</Text>
-                  <TouchableOpacity style={styles.authButton} onPress={() => signOut(auth)}>
+                  <TouchableOpacity
+                    style={styles.authButton}
+                    onPress={() => signOut(auth)}
+                  >
                     <Text>로그아웃</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row' }}>
-                  <TouchableOpacity style={styles.authButton} onPress={() => setAuthModalOpen(true)}>
+                  <TouchableOpacity
+                    style={styles.authButton}
+                    onPress={() => { setAuthMode('login'); setAuthModalOpen(true); }}
+                  >
                     <Text>로그인</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.authButton} onPress={() => setAuthModalOpen(true)}>
+                  <TouchableOpacity
+                    style={styles.authButton}
+                    onPress={() => { setAuthMode('signup'); setAuthModalOpen(true); }}
+                  >
                     <Text>회원가입</Text>
                   </TouchableOpacity>
                 </View>
@@ -204,20 +253,31 @@ const App = () => {
                   style={[styles.toggleBtn, !showBookmarks && styles.toggleActive]}
                   onPress={() => { setShowBookmarks(false); setBookmarkSelection(null); }}
                 >
-                  <Text style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}>일반 모드</Text>
+                  <Text
+                    style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}
+                  >
+                    일반 모드
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.toggleBtn, showBookmarks && styles.toggleActive]}
                   onPress={() => { setShowBookmarks(true); setBookmarkSelection(null); }}
                 >
-                  <Text style={[styles.toggleText, showBookmarks && styles.toggleTextActive]}>북마크 모드</Text>
+                  <Text
+                    style={[styles.toggleText, showBookmarks && styles.toggleTextActive]}
+                  >
+                    북마크 모드
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* 검색 · 필터 · 랜덤 추천 · 반경 */}
+            {/* 검색 · 필터 · 랜덤 · 반경 */}
             <View style={{ padding: 16 }}>
-              <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
+              <TouchableOpacity
+                style={styles.commonButton}
+                onPress={handleLocation}
+              >
                 <Text>현위치 검색</Text>
               </TouchableOpacity>
               <TextInput
@@ -246,10 +306,15 @@ const App = () => {
                 value={excludedCategory}
                 onChangeText={setExcludedCategory}
               />
-              <TouchableOpacity style={styles.randomButton} onPress={handleSpin}>
+              <TouchableOpacity
+                style={styles.randomButton}
+                onPress={handleSpin}
+              >
                 <Text>랜덤 추천</Text>
               </TouchableOpacity>
-              {noIncludedMessage && <Text style={styles.resultMessage}>{noIncludedMessage}</Text>}
+              {noIncludedMessage && (
+                <Text style={styles.resultMessage}>{noIncludedMessage}</Text>
+              )}
             </View>
 
             {/* 지도 */}
@@ -267,9 +332,11 @@ const App = () => {
         )}
         renderItem={renderItem}
       />
-      <AuthModal mode={authMode} open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      <AuthModal
+        mode={authMode}
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
     </SafeAreaView>
   );
-};
-
-export default App;
+}

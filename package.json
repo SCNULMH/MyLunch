@@ -11,14 +11,17 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.1.2",
     "expo": "~53.0.9",
+    "expo-app-loading": "^2.1.1",
+    "expo-font": "~13.3.1",
+    "expo-location": "~18.1.5",
     "expo-status-bar": "~2.2.3",
     "firebase": "^10.7.1",
     "react": "19.0.0",
     "react-native": "0.79.2",
     "react-native-webview": "^13.13.5",
-    "@react-native-async-storage/async-storage": "2.1.2",
-    "expo-location": "~18.1.5"
+    "expo-splash-screen": "~0.30.8"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
