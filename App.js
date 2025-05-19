@@ -21,28 +21,23 @@ import AuthModal from './components/AuthModal';
 import { subscribeBookmarks, addBookmark, removeBookmark } from './services/bookmark';
 import { styles } from './styles/styles_native';
 
-// 앱 런치 시 스플래시 자동 숨김 방지
+// 스플래시 자동 숨김 방지
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
-  // ─── 1) 커스텀 폰트 로드
+  // 1) 커스텀 폰트 로드 훅 (반드시 최상단에)
   const [fontsLoaded] = useFonts({
     CustomFont: require('./assets/fonts/font.ttf'),
   });
 
-  // ─── 2) 폰트 로딩 완료 시 스플래시 숨김
+  // 2) 폰트 로딩 완료 시 스플래시 숨김
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
 
-  // ─── 3) 로딩 전엔 아무것도 렌더하지 않음
-  if (!fontsLoaded) {
-    return null;
-  }
-
-  // ─── 4) 기타 훅 (순서 변경 금지) ───
+  // 3) 이제 모든 훅을 선언 (조건문 없이)
   const { height } = useWindowDimensions();
   const mapHeight = height * 0.35;
 
@@ -61,10 +56,10 @@ export default function App() {
   const [noIncludedMessage, setNoIncludedMessage] = useState('');
   const [showBookmarks, setShowBookmarks] = useState(false);
 
-  useEffect(() => {
-    setShowBookmarks(false);
-  }, []);
+  // 북마크 모드 초기화
+  useEffect(() => { setShowBookmarks(false); }, []);
 
+  // Firebase Auth & 북마크 구독
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, currentUser => {
       setUser(currentUser);
@@ -79,23 +74,33 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // ─── 헬퍼: 거리 계산 (Haversine) ───
+  // ─── 이때부터는 렌더링 앞단이므로,
+  //     fontsLoaded 검사 전에 어떤 훅도 빠지지 않습니다!
+
+  // 4) 로딩 전엔 아무것도 렌더하지 않음
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  // ─── 아래부터는 UI 로직 ───
+
+  // 거리 계산 헬퍼
   const calcDistance = (lat1, lon1, lat2, lon2) => {
-    const toRad = x => (x * Math.PI) / 180;
+    const toRad = x => (x * Math.PI)/180;
     const R = 6371000;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
+      Math.sin(dLat/2)**2 +
+      Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) *
+      Math.sin(dLon/2)**2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return Math.round(R * c);
   };
 
   const REST_API_KEY = '25d26859dae2a8cb671074b910e16912';
 
-  // ─── 카카오 API: 근처 식당 조회 ───
+  // 근처 식당 조회
   const fetchNearby = async (x, y) => {
     let all = [];
     for (let page = 1; page <= 3; page++) {
@@ -114,7 +119,7 @@ export default function App() {
     else Alert.alert('근처에 식당이 없습니다.');
   };
 
-  // ─── 현위치 검색 ───
+  // 현위치 검색
   const handleLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -128,7 +133,7 @@ export default function App() {
     fetchNearby(lng, lat);
   };
 
-  // ─── 랜덤 추천 ───
+  // 랜덤 추천
   const handleSpin = () => {
     setNoIncludedMessage('');
     const list = showBookmarks && user ? Object.values(bookmarks) : restaurants;
@@ -152,12 +157,12 @@ export default function App() {
     else setRestaurants(result);
   };
 
-  // ─── 토글별 화면 데이터 ───
+  // 표시할 데이터
   const displayData = showBookmarks && user
     ? (bookmarkSelection || Object.values(bookmarks))
     : restaurants;
 
-  // ─── 북마크 토글 ───
+  // 북마크 토글
   const toggleBookmark = (id, item) => {
     if (!user) {
       Alert.alert('로그인이 필요합니다.');
@@ -168,12 +173,13 @@ export default function App() {
     setBookmarkSelection(null);
   };
 
-  // ─── FlatList 렌더러 ───
+  // 리스트 아이템 렌더러
   const renderItem = ({ item }) => {
     const isBm = !!bookmarks[item.id];
     const dist = myPosition
       ? calcDistance(myPosition.lat, myPosition.lng, parseFloat(item.y), parseFloat(item.x))
       : item.distance;
+
     return (
       <View style={styles.cardContainer}>
         <View style={[styles.card, isBm && styles.bookmarked]}>
@@ -203,7 +209,7 @@ export default function App() {
     );
   };
 
-  // ─── UI 렌더링 ───
+  // ─── 최종 렌더 ───
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <FlatList
