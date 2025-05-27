@@ -1,7 +1,5 @@
-// App.js
-
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, View, Text, TextInput, TouchableOpacity, Alert, useWindowDimensions, FlatList, Linking } from 'react-native';
+import { SafeAreaView, View, Text, TextInput, TouchableOpacity, Alert, useWindowDimensions, FlatList, Linking, ScrollView } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as Location from 'expo-location';
@@ -12,6 +10,11 @@ import AuthModal from './components/AuthModal';
 import { subscribeBookmarks, addBookmark, removeBookmark } from './services/bookmark';
 import { styles } from './styles/styles_native';
 import { Ionicons } from '@expo/vector-icons';
+
+import Constants from 'expo-constants';
+
+// 환경 변수에서 API 키 불러오기
+const { KAKAO_JS_KEY, REST_API_KEY } = Constants.expoConfig.extra;
 
 const Tab = createBottomTabNavigator();
 
@@ -28,177 +31,10 @@ const calcDistance = (lat1, lon1, lat2, lon2) => {
   return Math.round(R * c);
 };
 
-const REST_API_KEY = '25d26859dae2a8cb671074b910e16912';
-
-function ExploreScreen(props) {
-  const {
-    user, bookmarks, setBookmarks, myPosition, setMyPosition, mapCenter, setMapCenter,
-    radius, setRadius, count, setCount, includedCategory, setIncludedCategory, excludedCategory, setExcludedCategory,
-    restaurants, setRestaurants, noIncludedMessage, setNoIncludedMessage, handleLocation, handleSpin,
-    showBookmarks, setShowBookmarks, bookmarkSelection, setBookmarkSelection, toggleBookmark, renderItem, mapHeight,
-    openLogin, openSignup
-  } = props;
-
-  const displayData = showBookmarks && user
-    ? (bookmarkSelection || Object.values(bookmarks))
-    : restaurants;
-
-  return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <FlatList
-        data={displayData}
-        keyExtractor={i => String(i.id)}
-        numColumns={2}
-        contentContainerStyle={{ padding: 8 }}
-        ListHeaderComponent={() => (
-          <>
-            {/* 헤더 */}
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
-              {user ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  <Text style={styles.welcomeMsg}>{user.displayName}님 환영!</Text>
-                  <TouchableOpacity style={styles.authButton} onPress={() => signOut(auth)}>
-                    <Text style={{ color: '#fff' }}>로그아웃</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={{ flexDirection: 'row' }}>
-                  <TouchableOpacity style={styles.authButton} onPress={openLogin}>
-                    <Text style={{ color: '#fff' }}>로그인</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.authButton} onPress={openSignup}>
-                    <Text style={{ color: '#fff' }}>회원가입</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-            {/* 모드 토글 */}
-            {user && (
-              <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                  style={[styles.toggleBtn, !showBookmarks && styles.toggleActive]}
-                  onPress={() => { setShowBookmarks(false); setBookmarkSelection(null); }}
-                >
-                  <Text style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}>일반 모드</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.toggleBtn, showBookmarks && styles.toggleActive]}
-                  onPress={() => { setShowBookmarks(true); setBookmarkSelection(null); }}
-                >
-                  <Text style={[styles.toggleText, showBookmarks && styles.toggleTextActive]}>북마크 모드</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {/* 검색 · 필터 · 랜덤 · 반경 */}
-            <View style={{ padding: 16 }}>
-              <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>현위치 검색</Text>
-              </TouchableOpacity>
-              <TextInput
-                style={styles.inputText}
-                placeholder="반경(m)"
-                keyboardType="numeric"
-                value={radius.toString()}
-                onChangeText={t => setRadius(Number(t) || radius)}
-              />
-              <TextInput
-                style={styles.inputText}
-                placeholder="추천 개수"
-                keyboardType="numeric"
-                value={count.toString()}
-                onChangeText={t => setCount(Number(t) || 0)}
-              />
-              <TextInput
-                style={styles.inputText}
-                placeholder="포함 카테고리(예: 한식)"
-                value={includedCategory}
-                onChangeText={setIncludedCategory}
-              />
-              <TextInput
-                style={styles.inputText}
-                placeholder="제외 카테고리(쉼표로 구분)"
-                value={excludedCategory}
-                onChangeText={setExcludedCategory}
-              />
-              <TouchableOpacity style={styles.randomButton} onPress={handleSpin}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>랜덤 추천</Text>
-              </TouchableOpacity>
-              {noIncludedMessage ? (
-                <Text style={styles.resultMessage}>{noIncludedMessage}</Text>
-              ) : null}
-              {/* 지도 */}
-              <View style={{ width: '100%', height: mapHeight }}>
-                <MapComponent
-                  style={{ width: '100%', height: '100%' }}
-                  mapCenter={mapCenter}
-                  restaurants={displayData}
-                  radius={radius}
-                  myPosition={myPosition}
-                  bookmarks={bookmarks}
-                />
-              </View>
-            </View>
-          </>
-        )}
-        renderItem={renderItem}
-      />
-    </SafeAreaView>
-  );
-}
-
-function SavedScreen(props) {
-  const { user, bookmarks, bookmarkSelection, setBookmarkSelection, toggleBookmark, renderItem } = props;
-  const displayData = bookmarkSelection || Object.values(bookmarks);
-  return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <FlatList
-        data={displayData}
-        keyExtractor={i => String(i.id)}
-        numColumns={2}
-        contentContainerStyle={{ padding: 8 }}
-        ListHeaderComponent={() => (
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>북마크</Text>
-          </View>
-        )}
-        renderItem={renderItem}
-        ListEmptyComponent={() => (
-          <Text style={styles.resultMessage}>북마크한 식당이 없습니다.</Text>
-        )}
-      />
-    </SafeAreaView>
-  );
-}
-
-function ProfileScreen(props) {
-  const { user, signOut, openLogin, openSignup } = props;
-  return (
-    <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      {user ? (
-        <>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>{user.displayName}님</Text>
-          <TouchableOpacity style={styles.authButton} onPress={signOut}>
-            <Text style={{ color: '#fff' }}>로그아웃</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <>
-          <TouchableOpacity style={styles.authButton} onPress={openLogin}>
-            <Text style={{ color: '#fff' }}>로그인</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.authButton} onPress={openSignup}>
-            <Text style={{ color: '#fff' }}>회원가입</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </SafeAreaView>
-  );
-}
-
 export default function App() {
   const { height } = useWindowDimensions();
   const mapHeight = height * 0.35;
+
   const [myPosition, setMyPosition] = useState(null);
   const [radius, setRadius] = useState(2000);
   const [restaurants, setRestaurants] = useState([]);
@@ -213,6 +49,10 @@ export default function App() {
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
   const [noIncludedMessage, setNoIncludedMessage] = useState('');
   const [showBookmarks, setShowBookmarks] = useState(false);
+
+  // 검색 관련 상태
+  const [addressQuery, setAddressQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
 
   const openLogin = () => { setAuthMode('login'); setAuthModalOpen(true); };
   const openSignup = () => { setAuthMode('signup'); setAuthModalOpen(true); };
@@ -232,6 +72,60 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // 장소명/주소 검색
+  const fetchAddressData = async (query) => {
+    const addressUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(query)}`;
+    const keywordUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&category_group_code=AT4`;
+
+    try {
+      const [addressResponse, keywordResponse] = await Promise.all([
+        fetch(addressUrl, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }),
+        fetch(keywordUrl, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }),
+      ]);
+      if (!addressResponse.ok || !keywordResponse.ok) {
+        throw new Error('검색 실패');
+      }
+
+      const addressData = await addressResponse.json();
+      const keywordData = await keywordResponse.json();
+
+      const combinedResults = [
+        ...(addressData.documents || []),
+        ...(keywordData.documents || [])
+      ];
+
+      // 결과 없으면 fallback
+      if (combinedResults.length === 0) {
+        const fallbackKeywordUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}`;
+        const fallbackResponse = await fetch(fallbackKeywordUrl, {
+          headers: { Authorization: `KakaoAK ${REST_API_KEY}` },
+        });
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          setSearchResults(fallbackData.documents || []);
+        } else {
+          Alert.alert("검색 결과가 없습니다.");
+        }
+      } else {
+        setSearchResults(combinedResults);
+      }
+    } catch (error) {
+      Alert.alert("검색 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 검색 결과에서 주소/장소 선택
+  const handleSelectAddress = (result) => {
+    // 좌표 정보 추출
+    const lat = parseFloat(result.y);
+    const lng = parseFloat(result.x);
+    setAddressQuery(result.address_name || result.place_name || '');
+    setMapCenter({ lat, lng });
+    fetchNearby(lng, lat);
+    setSearchResults([]);
+  };
+
+  // 근처 식당 검색
   const fetchNearby = async (x, y) => {
     let all = [];
     for (let page = 1; page <= 3; page++) {
@@ -286,25 +180,20 @@ export default function App() {
     else setRestaurants(result);
   };
 
-  // 변경된 toggleBookmark: 로컬 상태를 즉시 업데이트하도록 optimistic update 추가
   const toggleBookmark = (id, item) => {
     if (!user) {
       Alert.alert('로그인이 필요합니다.');
       return;
     }
     if (bookmarks[id]) {
-      // Firestore에서 삭제 요청
       removeBookmark(user.uid, id);
-      // 로컬에서도 바로 반영
       setBookmarks(prev => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
     } else {
-      // Firestore에 추가 요청
       addBookmark(user.uid, id, item);
-      // 로컬에서도 바로 반영
       setBookmarks(prev => ({ ...prev, [id]: item }));
     }
     setBookmarkSelection(null);
@@ -340,6 +229,192 @@ export default function App() {
     );
   };
 
+  function ExploreScreen(props) {
+    const displayData = showBookmarks && user
+      ? (bookmarkSelection || Object.values(bookmarks))
+      : restaurants;
+
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <FlatList
+          data={displayData}
+          keyExtractor={i => String(i.id)}
+          numColumns={2}
+          contentContainerStyle={{ padding: 8 }}
+          ListHeaderComponent={() => (
+            <>
+              {/* 헤더 */}
+              <View style={styles.header}>
+                <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
+                {user ? (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                    <Text style={styles.welcomeMsg}>{user.displayName}님 환영!</Text>
+                    <TouchableOpacity style={styles.authButton} onPress={() => signOut(auth)}>
+                      <Text style={{ color: '#fff' }}>로그아웃</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row' }}>
+                    <TouchableOpacity style={styles.authButton} onPress={openLogin}>
+                      <Text style={{ color: '#fff' }}>로그인</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.authButton} onPress={openSignup}>
+                      <Text style={{ color: '#fff' }}>회원가입</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+              {/* 모드 토글 */}
+              {user && (
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, !showBookmarks && styles.toggleActive]}
+                    onPress={() => { setShowBookmarks(false); setBookmarkSelection(null); }}
+                  >
+                    <Text style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}>일반 모드</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, showBookmarks && styles.toggleActive]}
+                    onPress={() => { setShowBookmarks(true); setBookmarkSelection(null); }}
+                  >
+                    <Text style={[styles.toggleText, showBookmarks && styles.toggleTextActive]}>북마크 모드</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {/* 검색창 및 결과 리스트 */}
+              <View style={{ padding: 8 }}>
+                <TextInput
+                  style={styles.inputText}
+                  placeholder="주소 또는 건물명 입력"
+                  value={addressQuery}
+                  onChangeText={setAddressQuery}
+                  onSubmitEditing={() => fetchAddressData(addressQuery)}
+                  returnKeyType="search"
+                />
+                <TouchableOpacity style={styles.commonButton} onPress={() => fetchAddressData(addressQuery)}>
+                  <Text style={{ color: '#fff' }}>검색</Text>
+                </TouchableOpacity>
+                {searchResults.length > 0 && (
+                  <ScrollView style={{ maxHeight: 180, backgroundColor: '#f7f7f7', marginVertical: 8 }}>
+                    {searchResults.map((result, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={{ padding: 10, borderBottomWidth: 1, borderColor: '#eee' }}
+                        onPress={() => handleSelectAddress(result)}
+                      >
+                        <Text>
+                          {result.address_name || result.place_name}
+                          {result.place_name && result.address_name ? ` (${result.place_name})` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+              {/* 검색 · 필터 · 랜덤 · 반경 */}
+              <View style={{ padding: 16 }}>
+                <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>현위치 검색</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.inputText}
+                  placeholder="반경(m)"
+                  keyboardType="numeric"
+                  value={radius.toString()}
+                  onChangeText={t => setRadius(Number(t) || radius)}
+                />
+                <TextInput
+                  style={styles.inputText}
+                  placeholder="추천 개수"
+                  keyboardType="numeric"
+                  value={count.toString()}
+                  onChangeText={t => setCount(Number(t) || 0)}
+                />
+                <TextInput
+                  style={styles.inputText}
+                  placeholder="포함 카테고리(예: 한식)"
+                  value={includedCategory}
+                  onChangeText={setIncludedCategory}
+                />
+                <TextInput
+                  style={styles.inputText}
+                  placeholder="제외 카테고리(쉼표로 구분)"
+                  value={excludedCategory}
+                  onChangeText={setExcludedCategory}
+                />
+                <TouchableOpacity style={styles.randomButton} onPress={handleSpin}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>랜덤 추천</Text>
+                </TouchableOpacity>
+                {noIncludedMessage ? (
+                  <Text style={styles.resultMessage}>{noIncludedMessage}</Text>
+                ) : null}
+                {/* 지도 */}
+                <View style={{ width: '100%', height: mapHeight }}>
+                  <MapComponent
+                    style={{ width: '100%', height: '100%' }}
+                    mapCenter={mapCenter}
+                    restaurants={displayData}
+                    radius={radius}
+                    myPosition={myPosition}
+                    bookmarks={bookmarks}
+                  />
+                </View>
+              </View>
+            </>
+          )}
+          renderItem={renderItem}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  function SavedScreen(props) {
+    const displayData = bookmarkSelection || Object.values(bookmarks);
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <FlatList
+          data={displayData}
+          keyExtractor={i => String(i.id)}
+          numColumns={2}
+          contentContainerStyle={{ padding: 8 }}
+          ListHeaderComponent={() => (
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>북마크</Text>
+            </View>
+          )}
+          renderItem={renderItem}
+          ListEmptyComponent={() => (
+            <Text style={styles.resultMessage}>북마크한 식당이 없습니다.</Text>
+          )}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  function ProfileScreen(props) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        {user ? (
+          <>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>{user.displayName}님</Text>
+            <TouchableOpacity style={styles.authButton} onPress={() => signOut(auth)}>
+              <Text style={{ color: '#fff' }}>로그아웃</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity style={styles.authButton} onPress={openLogin}>
+              <Text style={{ color: '#fff' }}>로그인</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.authButton} onPress={openSignup}>
+              <Text style={{ color: '#fff' }}>회원가입</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <>
       <NavigationContainer>
@@ -358,60 +433,17 @@ export default function App() {
         >
           <Tab.Screen name="Explore">
             {() => (
-              <ExploreScreen
-                user={user}
-                bookmarks={bookmarks}
-                setBookmarks={setBookmarks}
-                myPosition={myPosition}
-                setMyPosition={setMyPosition}
-                mapCenter={mapCenter}
-                setMapCenter={setMapCenter}
-                radius={radius}
-                setRadius={setRadius}
-                count={count}
-                setCount={setCount}
-                includedCategory={includedCategory}
-                setIncludedCategory={setIncludedCategory}
-                excludedCategory={excludedCategory}
-                setExcludedCategory={setExcludedCategory}
-                restaurants={restaurants}
-                setRestaurants={setRestaurants}
-                noIncludedMessage={noIncludedMessage}
-                setNoIncludedMessage={setNoIncludedMessage}
-                handleLocation={handleLocation}
-                handleSpin={handleSpin}
-                showBookmarks={showBookmarks}
-                setShowBookmarks={setShowBookmarks}
-                bookmarkSelection={bookmarkSelection}
-                setBookmarkSelection={setBookmarkSelection}
-                toggleBookmark={toggleBookmark}
-                renderItem={renderItem}
-                mapHeight={mapHeight}
-                openLogin={openLogin}
-                openSignup={openSignup}
-              />
+              <ExploreScreen />
             )}
           </Tab.Screen>
           <Tab.Screen name="Saved">
             {() => (
-              <SavedScreen
-                user={user}
-                bookmarks={bookmarks}
-                bookmarkSelection={bookmarkSelection}
-                setBookmarkSelection={setBookmarkSelection}
-                toggleBookmark={toggleBookmark}
-                renderItem={renderItem}
-              />
+              <SavedScreen />
             )}
           </Tab.Screen>
           <Tab.Screen name="Profile">
             {() => (
-              <ProfileScreen
-                user={user}
-                signOut={() => signOut(auth)}
-                openLogin={openLogin}
-                openSignup={openSignup}
-              />
+              <ProfileScreen />
             )}
           </Tab.Screen>
         </Tab.Navigator>
