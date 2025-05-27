@@ -292,7 +292,7 @@ export default function App() {
           >
             {/* 헤더/로그인/모드 토글 */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
+              {/* <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>  헤더 잠시 없애는 게 더 이쁜거 같음*/}
               {user ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                   <Text style={styles.welcomeMsg}>{user.displayName}님 환영!</Text>
