@@ -27,10 +27,10 @@ import { styles } from './styles/styles_native';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
-// 환경 변수
-const { KAKAO_JS_KEY, REST_API_KEY } = Constants.expoConfig.extra;
+// 환경 변수에서 API 키 불러오기
+const { REST_API_KEY } = Constants.expoConfig.extra;
 
-// 거리 계산
+// 거리 계산 함수
 function calcDistance(lat1, lon1, lat2, lon2) {
   const toRad = x => (x * Math.PI) / 180;
   const R = 6371000;
@@ -38,8 +38,9 @@ function calcDistance(lat1, lon1, lat2, lon2) {
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) ** 2;
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c);
 }
@@ -47,32 +48,52 @@ function calcDistance(lat1, lon1, lat2, lon2) {
 const Tab = createBottomTabNavigator();
 
 export default function App() {
-  const { height } = useWindowDimensions();
-  const mapHeight = height * 0.35;
-
-  // 공통 상태
+  // 공통 인증 & 북마크 상태
   const [user, setUser] = useState(null);
   const [bookmarks, setBookmarks] = useState({});
-  const [bookmarkSelection, setBookmarkSelection] = useState(null);
 
   // Auth 구독
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
       setUser(u);
-      setBookmarkSelection(null);
-      if (!u) return setBookmarks({});
-      return subscribeBookmarks(u.uid, data => setBookmarks({ ...data }));
+      if (!u) {
+        setBookmarks({});
+      } else {
+        return subscribeBookmarks(u.uid, data => setBookmarks({ ...data }));
+      }
     });
     return () => unsub();
   }, []);
 
-  // ExploreScreen 정의
+  // 북마크 토글 (App 레벨)
+  const toggleBookmark = (id, item) => {
+    if (!user) {
+      Alert.alert('로그인이 필요합니다.');
+      return;
+    }
+    if (bookmarks[id]) {
+      removeBookmark(user.uid, id);
+      setBookmarks(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } else {
+      addBookmark(user.uid, id, item);
+      setBookmarks(prev => ({ ...prev, [id]: item }));
+    }
+  };
+
+  // ExploreScreen
   function ExploreScreen() {
+    const { height } = useWindowDimensions();
+    const mapHeight = height * 0.35;
+
     // 화면별 상태
     const [myPosition, setMyPosition] = useState(null);
     const [radius, setRadius] = useState(2000);
     const [restaurants, setRestaurants] = useState([]);
-    const [count, setCount] = useState(0);
+    const [count, setCount] = useState(5);
     const [excludedCategory, setExcludedCategory] = useState('');
     const [includedCategory, setIncludedCategory] = useState('');
     const [addressQuery, setAddressQuery] = useState('');
@@ -80,31 +101,32 @@ export default function App() {
     const [noMessage, setNoMessage] = useState('');
     const [showBookmarks, setShowBookmarks] = useState(false);
     const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
-    const [isListOpen, setIsListOpen] = useState(false); // 초기 닫힘
+    const [isListOpen, setIsListOpen] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authMode, setAuthMode] = useState('login');
 
     const openLogin = () => { setAuthMode('login'); setAuthModalOpen(true); };
     const openSignup = () => { setAuthMode('signup'); setAuthModalOpen(true); };
 
-    // 장소/키워드 검색
+    // 주소/키워드 검색
     const fetchAddressData = async q => {
       try {
         const addrUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(q)}`;
-        const keyUrl  = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&category_group_code=AT4`;
+        const keyUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&category_group_code=AT4`;
         const [addrRes, keyRes] = await Promise.all([
-          fetch(addrUrl, { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}),
-          fetch(keyUrl, { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }})
+          fetch(addrUrl, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }),
+          fetch(keyUrl, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } })
         ]);
         if (!addrRes.ok || !keyRes.ok) throw new Error();
         const addrJson = await addrRes.json();
-        const keyJson  = await keyRes.json();
+        const keyJson = await keyRes.json();
         const combined = [...(addrJson.documents||[]), ...(keyJson.documents||[])];
-        if (combined.length) setSearchResults(combined);
-        else {
+        if (combined.length) {
+          setSearchResults(combined);
+        } else {
           const fbRes = await fetch(
             `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}`,
-            { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}
+            { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
           );
           if (!fbRes.ok) throw new Error();
           const fbJson = await fbRes.json();
@@ -123,17 +145,17 @@ export default function App() {
       setSearchResults([]);
     };
 
-    // 근처 식당 받아오기
-    const fetchNearby = async (x,y) => {
+    // 근처 식당 검색
+    const fetchNearby = async (x, y) => {
       let all = [];
-      for (let page=1; page<=3; page++){
+      for (let page=1; page<=3; page++) {
         const res = await fetch(
           `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${x}&y=${y}&radius=${radius}&page=${page}`,
-          { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}
+          { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
         );
         if (!res.ok) break;
         const js = await res.json();
-        if (js.documents.length){
+        if (js.documents.length) {
           all.push(...js.documents);
           if (js.documents.length<15) break;
         }
@@ -142,7 +164,7 @@ export default function App() {
       else Alert.alert('근처에 식당이 없습니다.');
     };
 
-    // 현위치
+    // 현위치 검색
     const handleLocation = async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status!=='granted') {
@@ -156,66 +178,39 @@ export default function App() {
       fetchNearby(lng,lat);
     };
 
-    // 랜덤 추천 (북마크 모드에도 radius 필터 추가)
+    // 랜덤 추천 (검색된 restaurants 대상)
     const handleSpin = useCallback(async () => {
       setNoMessage('');
-      const base = showBookmarks && user
-        ? Object.values(bookmarks)
-        : restaurants;
-      if ((showBookmarks&&user&&!base.length) || (!showBookmarks&&!restaurants.length)) {
-        Alert.alert(showBookmarks?'북마크가 없습니다.':'식당 데이터를 먼저 불러오세요.');
+      if (!restaurants.length) {
+        Alert.alert('먼저 식당을 검색해주세요.');
         return;
       }
-      // 거리 필터: mapCenter 기준
-      let filtered = base.filter(r => {
-        const dist = calcDistance(mapCenter.lat,mapCenter.lng,parseFloat(r.y),parseFloat(r.x));
-        return (!showBookmarks || dist<=radius);
-      });
-      // 포함/제외 카테고리
+      let filtered = [...restaurants];
       const excl = excludedCategory.split(',').map(s=>s.trim()).filter(Boolean);
       const incl = includedCategory.trim();
       filtered = filtered.filter(r=>{
         const ex = excl.some(c=>r.category_name.includes(c));
         const inl = incl? r.category_name.includes(incl): true;
-        return !ex&&inl;
+        return !ex && inl;
       });
-      if (!filtered.length && incl){
+      if (!filtered.length && incl) {
         setNoMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
-        filtered = base;
+        filtered = [...restaurants];
       }
-      const result = filtered.sort(()=>0.5-Math.random()).slice(0,count||5);
-      if (showBookmarks&&user) setBookmarkSelection(result);
-      else setRestaurants(result);
-    },[
-      showBookmarks,user,bookmarks,restaurants,
-      excludedCategory,includedCategory,count,
-      radius,mapCenter
-    ]);
+      setRestaurants(filtered.sort(()=>0.5-Math.random()).slice(0, count||5));
+    },[restaurants,excludedCategory,includedCategory,count]);
 
-    // 북마크 토글
-    const toggleBookmark = (id,item) => {
-      if (!user) return Alert.alert('로그인이 필요합니다.');
-      if (bookmarks[id]){
-        removeBookmark(user.uid,id);
-        setBookmarks(p=>{const n={...p};delete n[id];return n;});
-      } else {
-        addBookmark(user.uid,id,item);
-        setBookmarks(p=>({...p,[id]:item}));
-      }
-      setBookmarkSelection(null);
-    };
-
-    // 리스트 아이템 렌더
-    const renderItem = ({item})=>{
+    // ExploreScreen 렌더 아이템
+    const renderRestaurantItem = ({item})=>{
       const isBm = !!bookmarks[item.id];
       const dist = myPosition
         ? calcDistance(myPosition.lat,myPosition.lng,parseFloat(item.y),parseFloat(item.x))
         : item.distance;
       return (
         <View style={styles.cardContainer}>
-          <View style={[styles.card,isBm&&styles.bookmarked]}>
+          <View style={[styles.card, isBm&&styles.bookmarked]}>
             <TouchableOpacity
-              style={[styles.starBtn,isBm&&styles.starActive]}
+              style={[styles.starBtn, isBm&&styles.starActive]}
               onPress={()=>toggleBookmark(item.id,item)}
             >
               <Ionicons name={isBm?'star':'star-outline'} size={20} color={isBm?'#fff':'#FFD600'} />
@@ -233,8 +228,14 @@ export default function App() {
       );
     };
 
-    const displayData = showBookmarks&&user
-      ? (bookmarkSelection||Object.values(bookmarks))
+    // 북마크 모드 시, 범위 내 북마크만
+    const inRangeBookmarks = Object.values(bookmarks).filter(r=>{
+      const dist = calcDistance(mapCenter.lat,mapCenter.lng,parseFloat(r.y),parseFloat(r.x));
+      return dist <= radius;
+    });
+
+    const displayData = showBookmarks && user
+      ? inRangeBookmarks
       : restaurants;
 
     return (
@@ -243,7 +244,7 @@ export default function App() {
           behavior={Platform.OS==='ios'?'padding':undefined}
           style={{flex:1}}
         >
-          {/* 검색·필터·지도 */}
+          {/* 검색 · 필터 · 지도 */}
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{paddingBottom:8}}
@@ -273,16 +274,20 @@ export default function App() {
             {user && (
               <View style={styles.toggleContainer}>
                 <TouchableOpacity
-                  style={[styles.toggleBtn,!showBookmarks&&styles.toggleActive]}
-                  onPress={()=>{setShowBookmarks(false);setBookmarkSelection(null);}}
+                  style={[styles.toggleBtn, !showBookmarks&&styles.toggleActive]}
+                  onPress={()=>setShowBookmarks(false)}
                 >
-                  <Text style={[styles.toggleText,!showBookmarks&&styles.toggleTextActive]}>일반 모드</Text>
+                  <Text style={[styles.toggleText, !showBookmarks&&styles.toggleTextActive]}>
+                    일반 모드
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.toggleBtn,showBookmarks&&styles.toggleActive]}
-                  onPress={()=>{setShowBookmarks(true);setBookmarkSelection(null);}}
+                  style={[styles.toggleBtn, showBookmarks&&styles.toggleActive]}
+                  onPress={()=>setShowBookmarks(true)}
                 >
-                  <Text style={[styles.toggleText,showBookmarks&&styles.toggleTextActive]}>북마크 모드</Text>
+                  <Text style={[styles.toggleText, showBookmarks&&styles.toggleTextActive]}>
+                    북마크 모드
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -317,7 +322,7 @@ export default function App() {
                 </ScrollView>
               )}
             </View>
-            {/* 필터·랜덤·반경 */}
+            {/* 필터 · 랜덤 · 반경 */}
             <View style={{padding:16}}>
               <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
                 <Text style={{color:'#fff',fontWeight:'bold'}}>현위치 검색</Text>
@@ -338,13 +343,13 @@ export default function App() {
               />
               <TextInput
                 style={styles.inputText}
-                placeholder="포함 카테고리(예: 한식)"
+                placeholder="포함 카테고리"
                 value={includedCategory}
                 onChangeText={setIncludedCategory}
               />
               <TextInput
                 style={styles.inputText}
-                placeholder="제외 카테고리(쉼표로 구분)"
+                placeholder="제외 카테고리"
                 value={excludedCategory}
                 onChangeText={setExcludedCategory}
               />
@@ -381,7 +386,7 @@ export default function App() {
               keyExtractor={i=>String(i.id)}
               numColumns={2}
               contentContainerStyle={{padding:8}}
-              renderItem={renderItem}
+              renderItem={renderRestaurantItem}
               keyboardShouldPersistTaps="handled"
             />
           )}
@@ -396,10 +401,9 @@ export default function App() {
     );
   }
 
-  // SavedScreen: 전체 북마크 카드로 표시
+  // SavedScreen: 전체 북마크 목록
   function SavedScreen() {
     const displayData = Object.values(bookmarks);
-    // renderItem 재사용
     return (
       <SafeAreaView style={{flex:1}}>
         <FlatList
@@ -412,9 +416,8 @@ export default function App() {
               <Text style={styles.headerTitle}>북마크</Text>
             </View>
           )}
-          renderItem={({item})=>{
+          renderItem={({item}) => {
             const isBm = true;
-            // 북마크만 보기이므로 거리 계산 없이 바로 카드
             return (
               <View style={styles.cardContainer}>
                 <View style={[styles.card, styles.bookmarked]}>
@@ -427,7 +430,7 @@ export default function App() {
                   <Text style={styles.restaurantTitle}>{item.place_name}</Text>
                   <Text style={styles.restaurantMeta}>{item.road_address_name||item.address_name}</Text>
                   <Text style={styles.restaurantMeta}>{item.category_name}</Text>
-                  {item.phone&&<Text style={styles.restaurantMeta}>전화: {item.phone}</Text>}
+                  {item.phone && <Text style={styles.restaurantMeta}>전화: {item.phone}</Text>}
                   <TouchableOpacity style={styles.detailBtn} onPress={()=>Linking.openURL(item.place_url)}>
                     <Text style={styles.detailText}>상세보기</Text>
                   </TouchableOpacity>
@@ -489,11 +492,11 @@ export default function App() {
 
 const localStyles = StyleSheet.create({
   toggleWrapper: {
-    position:'absolute',bottom:0,left:0,right:0,height:40,
-    alignItems:'center',justifyContent:'center',
-    backgroundColor:'rgba(255,255,255,0.9)',zIndex:10
+    position:'absolute', bottom:0, left:0, right:0, height:40,
+    alignItems:'center', justifyContent:'center',
+    backgroundColor:'rgba(255,255,255,0.9)', zIndex:10
   },
   toggleText: {
-    fontSize:16,fontWeight:'600'
+    fontSize:16, fontWeight:'600'
   }
 });
