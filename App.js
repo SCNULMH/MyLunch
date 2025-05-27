@@ -52,6 +52,11 @@ function ExploreScreen({
   const { height } = useWindowDimensions();
   const mapHeight = height * 0.35;
 
+  // hold full list of restaurants from API
+  // random picks stored separately
+  const [generalSelection, setGeneralSelection] = useState([]);
+  const [bookmarkSelection, setBookmarkSelection] = useState([]);
+
   const [addressQuery, setAddressQuery] = useState('');
   const [isListOpen, setIsListOpen] = useState(false);
 
@@ -101,8 +106,12 @@ function ExploreScreen({
       all.push(...js.documents);
       if (js.documents.length<15) break;
     }
-    if (all.length) setRestaurants(all);
-    else Alert.alert('근처에 식당이 없습니다.');
+    if (all.length) {
+      setRestaurants(all);
+      setGeneralSelection([]); // clear previous selection
+    } else {
+      Alert.alert('근처에 식당이 없습니다.');
+    }
   };
 
   // 3) 현위치 검색
@@ -119,24 +128,68 @@ function ExploreScreen({
     fetchNearby(lng,lat);
   };
 
-  // 4) 랜덤 추천 (검색된 리스트에만)
-  const handleSpin = useCallback(()=>{
+  // 4) 랜덤 추천
+  const handleSpin = useCallback(async ()=>{
     setNoMessage('');
-    if (!restaurants.length) return Alert.alert('먼저 식당을 검색해주세요.');
-    let f = restaurants.slice();
-    const excl = excludedCategory.split(',').map(s=>s.trim()).filter(Boolean);
-    const incl = includedCategory.trim();
-    f = f.filter(r=>{
-      const bad = excl.some(c=>r.category_name.includes(c));
-      const ok  = incl? r.category_name.includes(incl): true;
+    if (showBookmarks && user) {
+      // 북마크 모드: 범위 내 북마크만
+      let list = Object.values(bookmarks);
+      const excl = excludedCategory.split(',').map(s=>s.trim()).filter(Boolean);
+      const incl = includedCategory.trim();
+      let filtered = list.filter(r=>{
+        const isEx = excl.some(c=>r.category_name.includes(c));
+        const isIn = incl ? r.category_name.includes(incl) : true;
+        return !isEx && isIn;
+      });
+      if (!filtered.length && incl) {
+        setNoMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
+        filtered = list;
+      }
+      const result = filtered.sort(() => 0.5 - Math.random()).slice(0, count || 5);
+      setBookmarkSelection(result);
+      return;
+    }
+
+    // 일반 모드: fetch fresh nearby each time
+    if (!mapCenter) {
+      Alert.alert('먼저 위치를 설정해주세요.');
+      return;
+    }
+    // fetch full list
+    let fresh = [];
+    for (let p=1; p<=3; p++){
+      const res = await fetch(
+        `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${mapCenter.lng}&y=${mapCenter.lat}&radius=${radius}&page=${p}`,
+        { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}
+      );
+      if (!res.ok) break;
+      const js = await res.json();
+      fresh.push(...js.documents);
+      if (js.documents.length<15) break;
+    }
+    if (!fresh.length) {
+      Alert.alert('먼저 식당을 검색해주세요.');
+      return;
+    }
+    // category filter
+    const excl2 = excludedCategory.split(',').map(s=>s.trim()).filter(Boolean);
+    const incl2 = includedCategory.trim();
+    let filtered2 = fresh.filter(r=>{
+      const bad = excl2.some(c=>r.category_name.includes(c));
+      const ok  = incl2 ? r.category_name.includes(incl2) : true;
       return !bad && ok;
     });
-    if (!f.length && incl) {
-      setNoMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
-      f = restaurants.slice();
+    if (!filtered2.length && incl2) {
+      setNoMessage(`${incl2} 관련 음식점 없음. 전체에서 추천합니다.`);
+      filtered2 = fresh;
     }
-    setRestaurants(f.sort(()=>0.5-Math.random()).slice(0,count));
-  },[restaurants,excludedCategory,includedCategory,count]);
+    const result2 = filtered2.sort(() => 0.5 - Math.random()).slice(0, count || 5);
+    setGeneralSelection(result2);
+  },[
+    showBookmarks, user, bookmarks,
+    mapCenter, radius, excludedCategory,
+    includedCategory, count
+  ]);
 
   // 5) 카드 렌더러
   const renderRestaurantItem = ({ item }) => {
@@ -166,23 +219,20 @@ function ExploreScreen({
     );
   };
 
-  // 범위 내 북마크만
-  const inRange = Object.values(bookmarks).filter(r=>{
-    if (!myPosition) return false;
-    const d = calcDistance(mapCenter.lat,mapCenter.lng,parseFloat(r.y),parseFloat(r.x));
-    return d <= radius;
-  });
+  // determine displayData
+  const displayData = showBookmarks && user
+    ? bookmarkSelection
+    : generalSelection.length ? generalSelection : restaurants;
 
-  const data = showBookmarks&&user ? inRange : restaurants;
-
-  // 리스트 열기 전/범위 내 가이드
+  // 안내 메시지
   let emptyMsg = '';
   if (isListOpen) {
-    if (showBookmarks) {
+    if (showBookmarks && user) {
       if (!myPosition) emptyMsg = '먼저 위치를 설정해주세요.';
-      else if (!inRange.length) emptyMsg = '범위 내 북마크한 식당이 없습니다.';
+      else if (!bookmarkSelection.length) emptyMsg = '범위 내 북마크한 식당이 없습니다.';
     } else {
       if (!restaurants.length) emptyMsg = '먼저 검색하거나 현위치를 설정해주세요.';
+      else if (!displayData.length) emptyMsg = '랜덤 추천을 눌러주세요.';
     }
   }
 
@@ -211,7 +261,6 @@ function ExploreScreen({
               </TouchableOpacity>
             </View>
           )}
-
           {/* 검색창 */}
           <View style={{padding:8}}>
             <TextInput
@@ -239,8 +288,7 @@ function ExploreScreen({
               </ScrollView>
             )}
           </View>
-
-          {/* 필터·랜덤·반경 */}
+          {/* 필터 · 랜덤 · 반경 */}
           <View style={{padding:16}}>
             <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
               <Text style={{color:'#fff',fontWeight:'bold'}}>현위치 검색</Text>
@@ -279,7 +327,7 @@ function ExploreScreen({
               <MapComponent
                 style={{width:'100%',height:'100%'}}
                 mapCenter={mapCenter}
-                restaurants={data}
+                restaurants={displayData}
                 radius={radius}
                 myPosition={myPosition}
                 bookmarks={bookmarks}
@@ -287,16 +335,15 @@ function ExploreScreen({
             </View>
           </View>
         </ScrollView>
-
+        {/* 리스트 토글 */}
         <TouchableOpacity style={localStyles.toggleWrapper} onPress={()=>setIsListOpen(v=>!v)}>
           <Text style={localStyles.toggleText}>{isListOpen?'▲ 접기':'▼ 펼치기'}</Text>
         </TouchableOpacity>
-
         {isListOpen && (
           emptyMsg
             ? <View style={{padding:16,alignItems:'center'}}><Text>{emptyMsg}</Text></View>
             : <FlatList
-                data={data}
+                data={displayData}
                 keyExtractor={i=>String(i.id)}
                 numColumns={2}
                 contentContainerStyle={{padding:8}}
@@ -327,9 +374,7 @@ function SavedScreen({ bookmarks, toggleBookmark }) {
         renderItem={({item})=>(
           <View style={styles.cardContainer}>
             <View style={[styles.card,styles.bookmarked]}>
-              <TouchableOpacity style={[styles.starBtn,styles.starActive]}
-                onPress={()=>toggleBookmark(item.id,item)}
-              >
+              <TouchableOpacity style={[styles.starBtn,styles.starActive]} onPress={()=>toggleBookmark(item.id,item)}>
                 <Ionicons name="star" size={20} color="#fff"/>
               </TouchableOpacity>
               <Text style={styles.restaurantTitle}>{item.place_name}</Text>
@@ -358,9 +403,7 @@ function ProfileScreen({ user, openLogin, openSignup }) {
     <SafeAreaView style={{flex:1,justifyContent:'center',alignItems:'center'}}>
       {user
         ? <>
-            <Text style={{fontSize:20,fontWeight:'bold',marginBottom:16}}>
-              {user.displayName}님
-            </Text>
+            <Text style={{fontSize:20,fontWeight:'bold',marginBottom:16}}>{user.displayName}님</Text>
             <TouchableOpacity style={styles.authButton} onPress={()=>signOut(auth)}>
               <Text style={{color:'#fff'}}>로그아웃</Text>
             </TouchableOpacity>
