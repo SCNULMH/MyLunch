@@ -10,10 +10,8 @@ import AuthModal from './components/AuthModal';
 import { subscribeBookmarks, addBookmark, removeBookmark } from './services/bookmark';
 import { styles } from './styles/styles_native';
 import { Ionicons } from '@expo/vector-icons';
-
 import Constants from 'expo-constants';
 
-// 환경 변수에서 API 키 불러오기
 const { KAKAO_JS_KEY, REST_API_KEY } = Constants.expoConfig.extra;
 
 const Tab = createBottomTabNavigator();
@@ -157,27 +155,63 @@ export default function App() {
     fetchNearby(lng, lat);
   };
 
-  const handleSpin = () => {
+  // 추천 버튼: 일반 모드에서만 새로운 데이터 요청
+  const handleSpin = async () => {
     setNoIncludedMessage('');
-    const list = showBookmarks && user ? Object.values(bookmarks) : restaurants;
-    if (!list.length) {
-      Alert.alert(showBookmarks ? '북마크가 없습니다.' : '식당이 없습니다.');
-      return;
+    if (showBookmarks && user) {
+      // 북마크 모드에서는 기존 방식 유지
+      const list = Object.values(bookmarks);
+      if (!list.length) {
+        Alert.alert('북마크가 없습니다.');
+        return;
+      }
+      const excl = excludedCategory.split(',').map(s => s.trim()).filter(Boolean);
+      const incl = includedCategory.trim();
+      let filtered = list.filter(r => {
+        const isEx = excl.some(c => r.category_name.includes(c));
+        const isIn = incl ? r.category_name.includes(incl) : true;
+        return !isEx && isIn;
+      });
+      if (!filtered.length && incl) {
+        setNoIncludedMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
+        filtered = list;
+      }
+      const result = filtered.sort(() => 0.5 - Math.random()).slice(0, count || 5);
+      setBookmarkSelection(result);
+    } else {
+      // 일반 모드: 지도 중심에서 새로 데이터 요청
+      const { lng, lat } = mapCenter;
+      let all = [];
+      for (let page = 1; page <= 3; page++) {
+        const res = await fetch(
+          `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${lng}&y=${lat}&radius=${radius}&page=${page}`,
+          { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
+        );
+        if (!res.ok) break;
+        const js = await res.json();
+        if (js.documents.length) {
+          all.push(...js.documents);
+          if (js.documents.length < 15) break;
+        }
+      }
+      if (!all.length) {
+        Alert.alert('근처에 식당이 없습니다.');
+        return;
+      }
+      const excl = excludedCategory.split(',').map(s => s.trim()).filter(Boolean);
+      const incl = includedCategory.trim();
+      let filtered = all.filter(r => {
+        const isEx = excl.some(c => r.category_name.includes(c));
+        const isIn = incl ? r.category_name.includes(incl) : true;
+        return !isEx && isIn;
+      });
+      if (!filtered.length && incl) {
+        setNoIncludedMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
+        filtered = all;
+      }
+      const result = filtered.sort(() => 0.5 - Math.random()).slice(0, count || 5);
+      setRestaurants(result);
     }
-    const excl = excludedCategory.split(',').map(s => s.trim()).filter(Boolean);
-    const incl = includedCategory.trim();
-    let filtered = list.filter(r => {
-      const isEx = excl.some(c => r.category_name.includes(c));
-      const isIn = incl ? r.category_name.includes(incl) : true;
-      return !isEx && isIn;
-    });
-    if (!filtered.length && incl) {
-      setNoIncludedMessage(`${incl} 관련 음식점 없음. 전체에서 추천합니다.`);
-      filtered = list;
-    }
-    const result = filtered.sort(() => 0.5 - Math.random()).slice(0, count || 5);
-    if (showBookmarks && user) setBookmarkSelection(result);
-    else setRestaurants(result);
   };
 
   const toggleBookmark = (id, item) => {
@@ -243,7 +277,6 @@ export default function App() {
           contentContainerStyle={{ padding: 8 }}
           ListHeaderComponent={() => (
             <>
-              {/* 헤더 */}
               <View style={styles.header}>
                 <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
                 {user ? (
@@ -264,7 +297,6 @@ export default function App() {
                   </View>
                 )}
               </View>
-              {/* 모드 토글 */}
               {user && (
                 <View style={styles.toggleContainer}>
                   <TouchableOpacity
@@ -281,7 +313,6 @@ export default function App() {
                   </TouchableOpacity>
                 </View>
               )}
-              {/* 검색창 및 결과 리스트 */}
               <View style={{ padding: 8 }}>
                 <TextInput
                   style={styles.inputText}
@@ -311,7 +342,6 @@ export default function App() {
                   </ScrollView>
                 )}
               </View>
-              {/* 검색 · 필터 · 랜덤 · 반경 */}
               <View style={{ padding: 16 }}>
                 <TouchableOpacity style={styles.commonButton} onPress={handleLocation}>
                   <Text style={{ color: '#fff', fontWeight: 'bold' }}>현위치 검색</Text>
@@ -348,7 +378,6 @@ export default function App() {
                 {noIncludedMessage ? (
                   <Text style={styles.resultMessage}>{noIncludedMessage}</Text>
                 ) : null}
-                {/* 지도 */}
                 <View style={{ width: '100%', height: mapHeight }}>
                   <MapComponent
                     style={{ width: '100%', height: '100%' }}

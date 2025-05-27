@@ -21,10 +21,11 @@ const MapComponent = ({
 }) => {
   const { lat, lng } = mapCenter;
   // EAS/EAS Update 환경에서는 expoConfig를, Expo Go(개발 중)에서는 manifest를 사용
-  const extra = Constants.expoConfig?.extra ?? Constants.manifest?.extra;
-  if (!extra) {
-    console.warn('⚠️ Expo Constants extra is null! Check app.config.js and .env settings.');
-  }
+  const extra = Constants.expoConfig?.extra;
+  // ?? Constants.manifest?.extra;
+  // if (!extra) {
+  //   console.warn('⚠️ Expo Constants extra is null! Check app.config.js and .env settings.');
+  // }
   const jsKey = extra?.KAKAO_JS_KEY;
 
   const htmlContent = `
