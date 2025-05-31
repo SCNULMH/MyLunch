@@ -1,3 +1,5 @@
+// css 스타일을 React Native 스타일로 변환
+
 import { StyleSheet, Dimensions } from 'react-native';
 const { width } = Dimensions.get('window');
 
