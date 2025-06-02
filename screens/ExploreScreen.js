@@ -1,5 +1,5 @@
 // screens/ExploreScreen.js
-// 메인 화면에서 식당을 검색하고, 북마크를 관리하며, 랜덤 추천 기능을 제공하는 ExploreScreen 컴포넌트입니다.
+// “주소 검색 | 검색”부터 “랜덤 추천”까지 요청하신 레이아웃으로 수정된 ExploreScreen 컴포넌트 예시입니다.
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -15,14 +15,14 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet
+  StyleSheet,
 } from 'react-native';
 import * as Location from 'expo-location';
 import MapComponent from '../components/MapComponent';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { calcDistance } from '../assets/utils/calcDistance';       // 이미 있는 calcDistance 함수
-import { subscribeBookmarks, addBookmark, removeBookmark } from '../services/bookmark'; // 이미 있는 서비스
+import { calcDistance } from '../assets/utils/calcDistance';
+import { subscribeBookmarks, addBookmark, removeBookmark } from '../services/bookmark';
 import { styles as commonStyles } from '../styles/styles_native';
 
 const { REST_API_KEY } = Constants.expoConfig.extra;
@@ -57,19 +57,19 @@ function ExploreScreen({
   const { height } = useWindowDimensions();
   const mapHeight = height * 0.35;
 
-  const [generalSelection, setGeneralSelection] = useState([]);   // 일반 랜덤 추천 결과
-  const [bookmarkSelection, setBookmarkSelection] = useState(null); // 북마크 모드 랜덤 결과 또는 검색 결과
-  const [addressQuery, setAddressQuery] = useState('');           // 검색창 입력값
-  const [isListOpen, setIsListOpen] = useState(false);            // 리스트 펼침/접힘
+  const [generalSelection, setGeneralSelection] = useState([]);
+  const [bookmarkSelection, setBookmarkSelection] = useState(null);
+  const [addressQuery, setAddressQuery] = useState('');
+  const [isListOpen, setIsListOpen] = useState(false);
 
   // 1) 주소/키워드 검색 (카카오 로컬 API)
   const fetchAddressData = async q => {
     try {
       const addrUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(q)}`;
-      const keyUrl  = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&category_group_code=AT4`;
+      const keyUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&category_group_code=AT4`;
       const [aR, kR] = await Promise.all([
-        fetch(addrUrl, { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}),
-        fetch(keyUrl, { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }})
+        fetch(addrUrl, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }),
+        fetch(keyUrl, { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }),
       ]);
       if (!aR.ok || !kR.ok) throw new Error();
       const aJ = await aR.json();
@@ -79,10 +79,9 @@ function ExploreScreen({
       if (combo.length) {
         setSearchResults(combo);
       } else {
-        // 주소 결과가 없으면 범위 제한 없는 키워드 재검색
         const fb = await fetch(
           `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}`,
-          { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}
+          { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
         );
         const fbJ = await fb.json();
         setSearchResults(fbJ.documents || []);
@@ -100,7 +99,7 @@ function ExploreScreen({
     fetchNearby(lng, lat);
     setSearchResults([]);
     setAddressQuery(r.address_name || r.place_name || '');
-    if (showBookmarks) setBookmarkSelection(null); // 북마크 모드였으면 초기화
+    if (showBookmarks) setBookmarkSelection(null);
   };
 
   // 2) 근처 식당 조회 (카카오 로컬 API)
@@ -109,12 +108,12 @@ function ExploreScreen({
     for (let p = 1; p <= 3; p++) {
       const res = await fetch(
         `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${x}&y=${y}&radius=${radius}&page=${p}`,
-        { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}
+        { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
       );
       if (!res.ok) break;
       const js = await res.json();
       all.push(...js.documents);
-      if (js.documents.length < 15) break; // 마지막 페이지
+      if (js.documents.length < 15) break;
     }
     if (all.length) {
       setRestaurants(all);
@@ -174,7 +173,7 @@ function ExploreScreen({
     for (let p = 1; p <= 3; p++) {
       const res = await fetch(
         `https://dapi.kakao.com/v2/local/search/keyword.json?query=식당&x=${mapCenter.lng}&y=${mapCenter.lat}&radius=${radius}&page=${p}`,
-        { headers:{ Authorization:`KakaoAK ${REST_API_KEY}` }}
+        { headers: { Authorization: `KakaoAK ${REST_API_KEY}` } }
       );
       if (!res.ok) break;
       const js = await res.json();
@@ -193,7 +192,7 @@ function ExploreScreen({
 
     let filt2 = fresh.filter(r => {
       const bad = excl2.some(c => r.category_name.includes(c));
-      const ok  = incl2 ? r.category_name.includes(incl2) : true;
+      const ok = incl2 ? r.category_name.includes(incl2) : true;
       return !bad && ok;
     });
     if (!filt2.length && incl2) {
@@ -209,7 +208,7 @@ function ExploreScreen({
     radius,
     excludedCategory,
     includedCategory,
-    count
+    count,
   ]);
 
   // 5) FlatList용 카드 렌더러
@@ -298,7 +297,7 @@ function ExploreScreen({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f7f7f7' }}>
       {/* ─────────── 헤더 ─────────── */}
       <View style={commonStyles.header}>
         <Text style={commonStyles.headerTitle}>오늘 뭐 먹지?</Text>
@@ -306,8 +305,8 @@ function ExploreScreen({
           <TouchableOpacity
             style={commonStyles.authButton}
             onPress={() => {
-              // 로그아웃은 App.js에서 onAuthStateChanged로 사용자 상태가 null이 됨
-              subscribeBookmarks(user.uid, () => {}); // 실제로는 signOut(auth)를 호출하면 됨
+              // 실제로는 signOut(auth)를 호출해야 합니다.
+              subscribeBookmarks(user.uid, () => {});
             }}
           >
             <Text style={{ color: '#fff' }}>로그아웃</Text>
@@ -380,8 +379,8 @@ function ExploreScreen({
           contentContainerStyle={{ paddingBottom: 8 }}
           style={{ flex: 1 }}
         >
-          {/* ─────────── 검색창 ─────────── */}
-          <View style={{ padding: 8 }}>
+          {/* ─────────── 주소 검색 | 검색 ─────────── */}
+          <View style={localStyles.searchSection}>
             <TextInput
               style={commonStyles.inputText}
               placeholder="주소 또는 건물명 입력"
@@ -390,22 +389,37 @@ function ExploreScreen({
               returnKeyType="search"
               blurOnSubmit={false}
             />
-            <TouchableOpacity
-              style={commonStyles.commonButton}
-              onPress={() => {
-                if (showBookmarks && user) {
-                  const q = addressQuery.trim();
-                  const filtered = inRangeBookmarks.filter(r =>
-                    r.place_name.includes(q) || r.address_name.includes(q)
-                  );
-                  setBookmarkSelection(filtered);
-                } else {
-                  fetchAddressData(addressQuery);
-                }
-              }}
-            >
-              <Text style={{ color: '#fff' }}>검색</Text>
-            </TouchableOpacity>
+
+            {/* 검색 버튼과 현위치 검색 버튼을 같은 줄에 배치 */}
+            <View style={localStyles.buttonRow}>
+              {/* 왼쪽: 검색 버튼 */}
+              <TouchableOpacity
+                style={[commonStyles.commonButton, localStyles.searchButton]}
+                onPress={() => {
+                  if (showBookmarks && user) {
+                    const q = addressQuery.trim();
+                    const filtered = inRangeBookmarks.filter(r =>
+                      r.place_name.includes(q) || r.address_name.includes(q)
+                    );
+                    setBookmarkSelection(filtered);
+                  } else {
+                    fetchAddressData(addressQuery);
+                  }
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>검색</Text>
+              </TouchableOpacity>
+
+              {/* 오른쪽: 현위치 검색 버튼 */}
+              <TouchableOpacity
+                style={[commonStyles.commonButton, localStyles.locationButton]}
+                onPress={handleLocation}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                  현위치 검색
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* 검색 결과 리스트 (주소 / 가게명) */}
             {(!showBookmarks || !user) && searchResults.length > 0 && (
@@ -414,6 +428,7 @@ function ExploreScreen({
                   maxHeight: 180,
                   backgroundColor: '#f7f7f7',
                   marginVertical: 8,
+                  borderRadius: 8,
                 }}
               >
                 {searchResults.map((r, i) => (
@@ -426,7 +441,7 @@ function ExploreScreen({
                     }}
                     onPress={() => handleSelectAddress(r)}
                   >
-                    <Text>
+                    <Text style={{ fontSize: 16 }}>
                       {r.address_name || r.place_name}
                       {r.place_name && r.address_name
                         ? ` (${r.place_name})`
@@ -438,65 +453,62 @@ function ExploreScreen({
             )}
           </View>
 
-          {/* ─────────── 필터 · 랜덤 · 반경 ─────────── */}
-          <View style={{ padding: 16 }}>
-            <TouchableOpacity
-              style={commonStyles.commonButton}
-              onPress={handleLocation}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                현위치 검색
-              </Text>
-            </TouchableOpacity>
+          {/* ─────────── 범위 | 범위설정 ─────────── */}
+          <View style={localStyles.rangeSection}>
+            <Text style={localStyles.rangeLabel}>범위</Text>
             <TextInput
-              style={commonStyles.inputText}
-              placeholder="반경(m)"
-              keyboardType="numeric"
+              style={localStyles.rangeInput}
               value={radius.toString()}
               onChangeText={t => setRadius(Number(t) || radius)}
-            />
-            <TextInput
-              style={commonStyles.inputText}
-              placeholder="추천 개수"
               keyboardType="numeric"
-              value={count.toString()}
-              onChangeText={t => setCount(Number(t) || 5)}
             />
-            <TextInput
-              style={commonStyles.inputText}
-              placeholder="포함 카테고리"
-              value={includedCategory}
-              onChangeText={setIncludedCategory}
-            />
-            <TextInput
-              style={commonStyles.inputText}
-              placeholder="제외 카테고리"
-              value={excludedCategory}
-              onChangeText={setExcludedCategory}
-            />
+            <Text style={localStyles.rangeUnit}>m</Text>
+          </View>
+
+          {/* ─────────── 포함 | 제외 ─────────── */}
+          <View style={localStyles.includeExcludeSection}>
+            <View style={localStyles.includeExcludeRow}>
+              <Text style={localStyles.includeExcludeLabel}>포함</Text>
+              <TextInput
+                style={localStyles.includeExcludeInput}
+                placeholder="포함 카테고리"
+                value={includedCategory}
+                onChangeText={setIncludedCategory}
+              />
+            </View>
+            <View style={localStyles.includeExcludeRow}>
+              <Text style={localStyles.includeExcludeLabel}>제외</Text>
+              <TextInput
+                style={localStyles.includeExcludeInput}
+                placeholder="제외 카테고리"
+                value={excludedCategory}
+                onChangeText={setExcludedCategory}
+              />
+            </View>
+          </View>
+
+          {/* ─────────── 랜덤 추천 ─────────── */}
+          <View style={localStyles.spinSection}>
             <TouchableOpacity
-              style={commonStyles.randomButton}
+              style={[commonStyles.commonButton, localStyles.spinButton]}
               onPress={handleSpin}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold' }}>
                 랜덤 추천
               </Text>
             </TouchableOpacity>
-            {!!noMessage && (
-              <Text style={commonStyles.resultMessage}>{noMessage}</Text>
-            )}
+          </View>
 
-            {/* ─────────── 지도 ─────────── */}
-            <View style={{ width: '100%', height: mapHeight }}>
-              <MapComponent
-                style={{ width: '100%', height: '100%' }}
-                mapCenter={mapCenter}
-                restaurants={displayData}
-                radius={radius}
-                myPosition={myPosition}
-                bookmarks={bookmarks}
-              />
-            </View>
+          {/* ─────────── 지도 ─────────── */}
+          <View style={{ width: '100%', height: mapHeight }}>
+            <MapComponent
+              style={{ width: '100%', height: '100%' }}
+              mapCenter={mapCenter}
+              restaurants={displayData}
+              radius={radius}
+              myPosition={myPosition}
+              bookmarks={bookmarks}
+            />
           </View>
         </ScrollView>
 
@@ -535,6 +547,97 @@ export default ExploreScreen;
 
 // 화면 전용 로컬 스타일
 const localStyles = StyleSheet.create({
+  // ─── 주소 검색 섹션 ───
+  searchSection: {
+    padding: 8,
+  },
+
+  // ─── 버튼 두 개를 가로 정렬하여 가운데 배치 ───
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  // 왼쪽: 검색 버튼
+  searchButton: {
+    flex: 1,
+    marginRight: 5, // 두 버튼 사이 5px 간격
+  },
+  // 오른쪽: 현위치 검색 버튼
+  locationButton: {
+    flex: 1,
+    marginLeft: 5, // 두 버튼 사이 5px 간격
+  },
+
+  // ─── 범위(Range) 섹션 ───
+  rangeSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  rangeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+    color: '#333',
+    width: 40, // “범위” 텍스트 고정 너비
+  },
+  rangeInput: {
+    flex: 1,
+    backgroundColor: '#f4f4f4',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    height: 44,
+  },
+  rangeUnit: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+
+  // ─── 포함 | 제외 섹션 ───
+  includeExcludeSection: {
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  includeExcludeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  includeExcludeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    width: 40, // “포함”/“제외” 고정 너비
+    color: '#333',
+  },
+  includeExcludeInput: {
+    flex: 1,
+    backgroundColor: '#f4f4f4',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    height: 44,
+  },
+
+  // ─── 랜덤 추천 섹션 ───
+  spinSection: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  spinButton: {
+    minWidth: 120,   // 현위치 검색 버튼과 동일 크기로 맞추려면  flex 대신 minWidth 사용
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#43A047',
+  },
+
+  // ─── 리스트 토글 ───
   toggleWrapper: {
     position: 'absolute',
     bottom: 0,
@@ -546,5 +649,9 @@ const localStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     zIndex: 10,
   },
-  toggleText: { fontSize: 16, fontWeight: '600' },
+  toggleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
 });

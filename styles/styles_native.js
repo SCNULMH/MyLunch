@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    backgroundColor: '#388E3C',
+    backgroundColor: '#white',
     paddingVertical: 24,
     paddingHorizontal: 40,
     borderTopLeftRadius: 32,
@@ -30,7 +30,7 @@ export const styles = StyleSheet.create({
     marginBottom: 24,
   },
   headerTitle: {
-    color: '#fff',
+    color: '#black',
     fontSize: 28,
     fontWeight: 'bold',
     letterSpacing: 1,
@@ -123,7 +123,7 @@ export const styles = StyleSheet.create({
     marginVertical: 8,
   },
   randomButton: {
-    backgroundColor: '#43A047',
+    backgroundColor: 'black',
     borderRadius: 24,
     paddingVertical: 16,
     paddingHorizontal: 34,
