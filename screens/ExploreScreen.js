@@ -1,7 +1,7 @@
 // screens/ExploreScreen.js
-// “주소 검색 | 검색”부터 “랜덤 추천”까지 요청하신 레이아웃으로 수정된 ExploreScreen 컴포넌트 예시입니다.
+// “주소 검색 | 검색”부터 “랜덤 추천”까지 레이아웃 및 zoom 유지 로직 반영한 ExploreScreen
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -62,8 +62,14 @@ function ExploreScreen({
   const [addressQuery, setAddressQuery] = useState('');
   const [isListOpen, setIsListOpen] = useState(false);
 
+  // **추가된 부분: 현재 줌 레벨 상태**
+  // 주소 검색하면 적당히 확대(예: 6), 현위치 검색하면 더 확대(예: 4)
+  const [zoomLevel, setZoomLevel] = useState(4);
+
+  // ────────────────────────────────────────────────
   // 1) 주소/키워드 검색 (카카오 로컬 API)
-  const fetchAddressData = async q => {
+  // ────────────────────────────────────────────────
+  const fetchAddressData = async (q) => {
     try {
       const addrUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(q)}`;
       const keyUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&category_group_code=AT4`;
@@ -92,17 +98,26 @@ function ExploreScreen({
   };
 
   // 1-2) 검색 결과 선택 → 지도 중심 좌표 설정 및 식당 조회
-  const handleSelectAddress = r => {
+  const handleSelectAddress = (r) => {
     const lat = parseFloat(r.y);
     const lng = parseFloat(r.x);
+
+    // 지도 중심을 검색한 주소로 설정
     setMapCenter({ lat, lng });
+
+    // 검색했을 때는 약간 넓게(zoomLevel 6~7) 보도록 설정
+    setZoomLevel(6);
+
+    // 검색하면 해당 위치 기준으로 식당 조회
     fetchNearby(lng, lat);
     setSearchResults([]);
     setAddressQuery(r.address_name || r.place_name || '');
     if (showBookmarks) setBookmarkSelection(null);
   };
 
+  // ────────────────────────────────────────────────
   // 2) 근처 식당 조회 (카카오 로컬 API)
+  // ────────────────────────────────────────────────
   const fetchNearby = async (x, y) => {
     let all = [];
     for (let p = 1; p <= 3; p++) {
@@ -124,7 +139,9 @@ function ExploreScreen({
     }
   };
 
+  // ────────────────────────────────────────────────
   // 3) 현위치 검색 버튼
+  // ────────────────────────────────────────────────
   const handleLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -132,12 +149,23 @@ function ExploreScreen({
       return;
     }
     const loc = await Location.getCurrentPositionAsync({});
-    setMyPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-    setMapCenter({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+    const newCenter = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+
+    // 현위치를 myPosition에 저장
+    setMyPosition(newCenter);
+    // 지도를 현위치 중심으로 업데이트
+    setMapCenter(newCenter);
+    // 현위치로 이동할 때는 좀 더 확대된(zoom-in) 레벨(예: 4)로 설정
+    setZoomLevel(4);
+
+    // 현위치 검색하면 해당 위치 기준으로 식당 조회
     fetchNearby(loc.coords.longitude, loc.coords.latitude);
   };
 
+  // ────────────────────────────────────────────────
   // 4) 랜덤 추천 (일반 모드 vs 북마크 모드 구분)
+  //    → zoomLevel은 건드리지 않으므로, “마지막 지정된 zoom” 그대로 유지
+  // ────────────────────────────────────────────────
   const handleSpin = useCallback(async () => {
     setNoMessage('');
 
@@ -146,12 +174,12 @@ function ExploreScreen({
       let list = Object.values(bookmarks);
       const excl = excludedCategory
         .split(',')
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean);
       const incl = includedCategory.trim();
 
-      let filtered = list.filter(r => {
-        const isEx = excl.some(c => r.category_name.includes(c));
+      let filtered = list.filter((r) => {
+        const isEx = excl.some((c) => r.category_name.includes(c));
         const isIn = incl ? r.category_name.includes(incl) : true;
         return !isEx && isIn;
       });
@@ -164,7 +192,7 @@ function ExploreScreen({
       return;
     }
 
-    // --- 일반 모드: 지도 중심 좌표로 fresh fetch + 필터 + 랜덤 ---
+    // --- 일반 모드: 지도 중심 좌표를 건드리지 않고 식당만 fresh fetch + 필터 + 랜덤 ---
     if (!mapCenter) {
       Alert.alert('먼저 위치를 설정해주세요.');
       return;
@@ -186,12 +214,12 @@ function ExploreScreen({
     }
     const excl2 = excludedCategory
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
     const incl2 = includedCategory.trim();
 
-    let filt2 = fresh.filter(r => {
-      const bad = excl2.some(c => r.category_name.includes(c));
+    let filt2 = fresh.filter((r) => {
+      const bad = excl2.some((c) => r.category_name.includes(c));
       const ok = incl2 ? r.category_name.includes(incl2) : true;
       return !bad && ok;
     });
@@ -200,6 +228,7 @@ function ExploreScreen({
       filt2 = fresh;
     }
     setGeneralSelection(filt2.sort(() => 0.5 - Math.random()).slice(0, count || 5));
+    // zoomLevel을 건드리지 않으므로, “마지막 지정된 zoom” 그대로 유지
   }, [
     showBookmarks,
     user,
@@ -211,7 +240,9 @@ function ExploreScreen({
     count,
   ]);
 
+  // ────────────────────────────────────────────────
   // 5) FlatList용 카드 렌더러
+  // ────────────────────────────────────────────────
   const renderRestaurantItem = ({ item }) => {
     const isBm = !!bookmarks[item.id];
     const dist = myPosition
@@ -258,10 +289,12 @@ function ExploreScreen({
     );
   };
 
-  // --- 북마크 모드일 때: 반경 범위 안의 북마크 리스트 ---
+  // ────────────────────────────────────────────────
+  // 북마크 모드일 때: 반경 범위 안의 북마크 리스트
+  // ────────────────────────────────────────────────
   const inRangeBookmarks = !myPosition
     ? Object.values(bookmarks)
-    : Object.values(bookmarks).filter(r => {
+    : Object.values(bookmarks).filter((r) => {
         const d = calcDistance(
           mapCenter.lat,
           mapCenter.lng,
@@ -271,7 +304,12 @@ function ExploreScreen({
         return d <= radius;
       });
 
+  // 북마크 배열
+  const bookmarkArray = Object.values(bookmarks);
+
+  // ────────────────────────────────────────────────
   // 최종 화면에 표시할 데이터 결정
+  // ────────────────────────────────────────────────
   const displayData =
     showBookmarks && user
       ? bookmarkSelection !== null
@@ -281,7 +319,9 @@ function ExploreScreen({
       ? generalSelection
       : restaurants;
 
+  // ────────────────────────────────────────────────
   // 리스트 펼쳐진 상태에서 빈 화면일 때 표시할 메시지
+  // ────────────────────────────────────────────────
   let emptyMsg = '';
   if (isListOpen) {
     if (showBookmarks && user) {
@@ -302,27 +342,15 @@ function ExploreScreen({
       <View style={styles.header}>
         <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
         {user ? (
-          <TouchableOpacity
-            style={styles.authButton}
-            onPress={() => {
-              // 실제로는 signOut(auth)를 호출해야 합니다.
-              subscribeBookmarks(user.uid, () => {});
-            }}
-          >
+          <TouchableOpacity style={styles.authButton} onPress={openLogin}>
             <Text style={{ color: '#fff' }}>로그아웃</Text>
           </TouchableOpacity>
         ) : (
           <>
-            <TouchableOpacity
-              style={styles.authButton}
-              onPress={openLogin}
-            >
+            <TouchableOpacity style={styles.authButton} onPress={openLogin}>
               <Text style={{ color: '#fff' }}>로그인</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.authButton}
-              onPress={openSignup}
-            >
+            <TouchableOpacity style={styles.authButton} onPress={openSignup}>
               <Text style={{ color: '#fff' }}>회원가입</Text>
             </TouchableOpacity>
           </>
@@ -379,8 +407,9 @@ function ExploreScreen({
                 onPress={() => {
                   if (showBookmarks && user) {
                     const q = addressQuery.trim();
-                    const filtered = inRangeBookmarks.filter(r =>
-                      r.place_name.includes(q) || r.address_name.includes(q)
+                    const filtered = inRangeBookmarks.filter(
+                      (r) =>
+                        r.place_name.includes(q) || r.address_name.includes(q)
                     );
                     setBookmarkSelection(filtered);
                   } else {
@@ -392,7 +421,7 @@ function ExploreScreen({
               </TouchableOpacity>
             </View>
 
-            {/* “현위치 검색” 버튼은 아래 줄에 작게 가운데 배치 */}
+            {/* ─────────── “현위치 검색” 버튼 ─────────── */}
             <View style={stylesNative.locationWrapper}>
               <TouchableOpacity
                 style={[styles.commonButton, stylesNative.locationBtnCompact]}
@@ -402,7 +431,7 @@ function ExploreScreen({
               </TouchableOpacity>
             </View>
 
-            {/* 검색 결과 리스트 (주소 / 가게명) */}
+            {/* ─────────── 검색 결과 리스트 (주소 / 가게명) ─────────── */}
             {(!showBookmarks || !user) && searchResults.length > 0 && (
               <ScrollView
                 style={{
@@ -438,7 +467,7 @@ function ExploreScreen({
             <TextInput
               style={stylesNative.rangeInput}
               value={radius.toString()}
-              onChangeText={t => setRadius(Number(t) || radius)}
+              onChangeText={(t) => setRadius(Number(t) || radius)}
               keyboardType="numeric"
             />
             <Text style={stylesNative.rangeUnit}>m</Text>
@@ -479,12 +508,13 @@ function ExploreScreen({
           {/* ─────────── 지도 ─────────── */}
           <View style={{ width: '100%', height: mapHeight }}>
             <MapComponent
-              style={{ width: '100%', height: '100%' }}
               mapCenter={mapCenter}
               restaurants={displayData}
               radius={radius}
               myPosition={myPosition}
               bookmarks={bookmarks}
+              zoomLevel={zoomLevel}
+              style={{ width: '100%', height: '100%' }}
             />
           </View>
         </ScrollView>
@@ -492,7 +522,7 @@ function ExploreScreen({
         {/* ─────────── 리스트 토글 ─────────── */}
         <TouchableOpacity
           style={stylesNative.toggleWrapper}
-          onPress={() => setIsListOpen(v => !v)}
+          onPress={() => setIsListOpen((v) => !v)}
         >
           <Text style={stylesNative.toggleText}>
             {isListOpen ? '▲ 접기' : '▼ 펼치기'}
@@ -508,7 +538,7 @@ function ExploreScreen({
           ) : (
             <FlatList
               data={displayData}
-              keyExtractor={i => String(i.id)}
+              keyExtractor={(i) => String(i.id)}
               numColumns={2}
               contentContainerStyle={{ padding: 8 }}
               renderItem={renderRestaurantItem}
@@ -522,9 +552,5 @@ function ExploreScreen({
 
 export default ExploreScreen;
 
-// 화면 전용 로컬 스타일
-const localStyles = StyleSheet.create({
-  // (이 부분은 이미 stylesNative 안에 정의되어 있어 ExploreScreen에서는 사용하지 않습니다)
-  // ExploreScreen 전용 스타일은 이제 모두 stylesNative에서 관리합니다.
-  // 여기에는 더 이상 추가적으로 스타일을 두지 않아도 됩니다.
-});
+// 화면 전용 로컬 스타일 (현재 사용 없음)
+const localStyles = StyleSheet.create({});
