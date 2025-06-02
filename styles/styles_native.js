@@ -1,4 +1,4 @@
-// css 스타일을 React Native 스타일로 변환
+// styles/styles_native.js
 
 import { StyleSheet, Dimensions } from 'react-native';
 const { width } = Dimensions.get('window');
@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    backgroundColor: '#white',
+    backgroundColor: '#fff',       // '#white' → '#fff'
     paddingVertical: 24,
     paddingHorizontal: 40,
     borderTopLeftRadius: 32,
@@ -26,11 +26,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 20,
     marginBottom: 24,
   },
   headerTitle: {
-    color: '#black',
+    color: '#000',                // '#black' → '#000'
     fontSize: 28,
     fontWeight: 'bold',
     letterSpacing: 1,
@@ -121,15 +120,19 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   randomButton: {
-    backgroundColor: 'black',
+    backgroundColor: '#000',
     borderRadius: 24,
     paddingVertical: 16,
     paddingHorizontal: 34,
     fontSize: 20,
     fontWeight: 'bold',
     marginVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   resultMessage: {
     color: '#1976D2',
@@ -220,6 +223,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#FFD600',
     borderColor: '#FFD600',
   },
+
   // 모드 토글 버튼
   toggleContainer: {
     flexDirection: 'row',
@@ -245,27 +249,134 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 export const stylesNative = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 32,
-    paddingBottom: 28,
-    alignItems: 'center',
-    marginVertical: 40,
-    width: '95%',
-    maxWidth: 600,
-    alignSelf: 'center',
-    elevation: 8,
+  // ───────────────────────────────────────────────────
+  // ExploreScreen 전용 레이아웃 스타일
+  // ───────────────────────────────────────────────────
+
+  // “주소 검색 | 검색” 섹션
+  searchSection: {
+    padding: 8,
   },
-  mapArea: {
-    width: '90%',
-    height: 220,
-    backgroundColor: '#eafbe7',
-    borderRadius: 28,
-    marginVertical: 24,
-    justifyContent: 'center',
+  searchRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 22,
+    justifyContent: 'center',      // 가로 중앙 정렬
+    width: '90%',                   // 부모 너비를 90%로 지정
+    maxWidth: 500,                  // 최대 너비 제한
+    alignSelf: 'center', 
+  },
+  searchBtnCompact: {
+    marginLeft: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    backgroundColor: '#4CAF50',
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // “현위치 검색” 버튼 (작게, 아래 줄에 중앙 배치)
+  locationWrapper: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  locationBtnCompact: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    backgroundColor: '#388E3C',
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // “범위 | 범위설정” 섹션
+  rangeSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  rangeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+    color: '#333',
+    width: 40, // “범위” 레이블 고정 너비
+  },
+  rangeInput: {
+    flex: 1,
+    backgroundColor: '#f4f4f4',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    height: 44,
+  },
+  rangeUnit: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+
+  // “포함 | 제외” 섹션
+  includeExcludeSection: {
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  includeExcludeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  includeExcludeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    width: 40, // “포함”/“제외” 레이블 고정 너비
+    color: '#333',
+  },
+  includeExcludeInput: {
+    flex: 1,
+    backgroundColor: '#f4f4f4',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    height: 44,
+  },
+
+  // “랜덤 추천” 섹션
+  spinSection: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  spinButton: {
+    minWidth: 120, // “현위치 검색” 버튼과 비슷한 크기
+    borderRadius: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: 'black',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // 리스트 토글 (플랫리스트 펼치기/접기)
+  toggleWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    zIndex: 10,
+  },
+  toggleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
 });

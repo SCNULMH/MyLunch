@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { calcDistance } from '../assets/utils/calcDistance';
 import { subscribeBookmarks, addBookmark, removeBookmark } from '../services/bookmark';
-import { styles as commonStyles } from '../styles/styles_native';
+import { styles, stylesNative } from '../styles/styles_native';
 
 const { REST_API_KEY } = Constants.expoConfig.extra;
 
@@ -224,10 +224,10 @@ function ExploreScreen({
       : item.distance;
 
     return (
-      <View style={commonStyles.cardContainer}>
-        <View style={[commonStyles.card, isBm && commonStyles.bookmarked]}>
+      <View style={styles.cardContainer}>
+        <View style={[styles.card, isBm && styles.bookmarked]}>
           <TouchableOpacity
-            style={[commonStyles.starBtn, isBm && commonStyles.starActive]}
+            style={[styles.starBtn, isBm && styles.starActive]}
             onPress={() => toggleBookmark(item.id, item)}
           >
             <Ionicons
@@ -236,22 +236,22 @@ function ExploreScreen({
               color={isBm ? '#fff' : '#FFD600'}
             />
           </TouchableOpacity>
-          <Text style={commonStyles.restaurantTitle}>{item.place_name}</Text>
-          <Text style={commonStyles.restaurantMeta}>
+          <Text style={styles.restaurantTitle}>{item.place_name}</Text>
+          <Text style={styles.restaurantMeta}>
             {item.road_address_name || item.address_name}
           </Text>
-          <Text style={commonStyles.restaurantMeta}>{item.category_name}</Text>
+          <Text style={styles.restaurantMeta}>{item.category_name}</Text>
           {item.phone && (
-            <Text style={commonStyles.restaurantMeta}>전화: {item.phone}</Text>
+            <Text style={styles.restaurantMeta}>전화: {item.phone}</Text>
           )}
           {dist != null && (
-            <Text style={commonStyles.restaurantMeta}>거리: {dist}m</Text>
+            <Text style={styles.restaurantMeta}>거리: {dist}m</Text>
           )}
           <TouchableOpacity
-            style={commonStyles.detailBtn}
+            style={styles.detailBtn}
             onPress={() => Linking.openURL(item.place_url)}
           >
-            <Text style={commonStyles.detailText}>상세보기</Text>
+            <Text style={styles.detailText}>상세보기</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -299,11 +299,11 @@ function ExploreScreen({
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f7f7f7' }}>
       {/* ─────────── 헤더 ─────────── */}
-      <View style={commonStyles.header}>
-        <Text style={commonStyles.headerTitle}>오늘 뭐 먹지?</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
         {user ? (
           <TouchableOpacity
-            style={commonStyles.authButton}
+            style={styles.authButton}
             onPress={() => {
               // 실제로는 signOut(auth)를 호출해야 합니다.
               subscribeBookmarks(user.uid, () => {});
@@ -314,13 +314,13 @@ function ExploreScreen({
         ) : (
           <>
             <TouchableOpacity
-              style={commonStyles.authButton}
+              style={styles.authButton}
               onPress={openLogin}
             >
               <Text style={{ color: '#fff' }}>로그인</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={commonStyles.authButton}
+              style={styles.authButton}
               onPress={openSignup}
             >
               <Text style={{ color: '#fff' }}>회원가입</Text>
@@ -331,39 +331,23 @@ function ExploreScreen({
 
       {/* ─────────── 모드 토글 (일반 모드 / 북마크 모드) ─────────── */}
       {user && (
-        <View style={commonStyles.toggleContainer}>
+        <View style={styles.toggleContainer}>
           <TouchableOpacity
-            style={[
-              commonStyles.toggleBtn,
-              !showBookmarks && commonStyles.toggleActive,
-            ]}
+            style={[styles.toggleBtn, !showBookmarks && styles.toggleActive]}
             onPress={() => {
               setShowBookmarks(false);
               setBookmarkSelection(null);
             }}
           >
-            <Text
-              style={[
-                commonStyles.toggleText,
-                !showBookmarks && commonStyles.toggleTextActive,
-              ]}
-            >
+            <Text style={[styles.toggleText, !showBookmarks && styles.toggleTextActive]}>
               일반 모드
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              commonStyles.toggleBtn,
-              showBookmarks && commonStyles.toggleActive,
-            ]}
+            style={[styles.toggleBtn, showBookmarks && styles.toggleActive]}
             onPress={() => setShowBookmarks(true)}
           >
-            <Text
-              style={[
-                commonStyles.toggleText,
-                showBookmarks && commonStyles.toggleTextActive,
-              ]}
-            >
+            <Text style={[styles.toggleText, showBookmarks && styles.toggleTextActive]}>
               북마크 모드
             </Text>
           </TouchableOpacity>
@@ -380,21 +364,18 @@ function ExploreScreen({
           style={{ flex: 1 }}
         >
           {/* ─────────── 주소 검색 | 검색 ─────────── */}
-          <View style={localStyles.searchSection}>
-            <TextInput
-              style={commonStyles.inputText}
-              placeholder="주소 또는 건물명 입력"
-              value={addressQuery}
-              onChangeText={setAddressQuery}
-              returnKeyType="search"
-              blurOnSubmit={false}
-            />
-
-            {/* 검색 버튼과 현위치 검색 버튼을 같은 줄에 배치 */}
-            <View style={localStyles.buttonRow}>
-              {/* 왼쪽: 검색 버튼 */}
+          <View style={stylesNative.searchSection}>
+            <View style={stylesNative.searchRow}>
+              <TextInput
+                style={styles.inputText}
+                placeholder="주소 또는 건물명 입력"
+                value={addressQuery}
+                onChangeText={setAddressQuery}
+                returnKeyType="search"
+                blurOnSubmit={false}
+              />
               <TouchableOpacity
-                style={[commonStyles.commonButton, localStyles.searchButton]}
+                style={[styles.commonButton, stylesNative.searchBtnCompact]}
                 onPress={() => {
                   if (showBookmarks && user) {
                     const q = addressQuery.trim();
@@ -409,15 +390,15 @@ function ExploreScreen({
               >
                 <Text style={{ color: '#fff', fontWeight: 'bold' }}>검색</Text>
               </TouchableOpacity>
+            </View>
 
-              {/* 오른쪽: 현위치 검색 버튼 */}
+            {/* “현위치 검색” 버튼은 아래 줄에 작게 가운데 배치 */}
+            <View style={stylesNative.locationWrapper}>
               <TouchableOpacity
-                style={[commonStyles.commonButton, localStyles.locationButton]}
+                style={[styles.commonButton, stylesNative.locationBtnCompact]}
                 onPress={handleLocation}
               >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                  현위치 검색
-                </Text>
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>현위치 검색</Text>
               </TouchableOpacity>
             </View>
 
@@ -443,9 +424,7 @@ function ExploreScreen({
                   >
                     <Text style={{ fontSize: 16 }}>
                       {r.address_name || r.place_name}
-                      {r.place_name && r.address_name
-                        ? ` (${r.place_name})`
-                        : ''}
+                      {r.place_name && r.address_name ? ` (${r.place_name})` : ''}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -454,32 +433,32 @@ function ExploreScreen({
           </View>
 
           {/* ─────────── 범위 | 범위설정 ─────────── */}
-          <View style={localStyles.rangeSection}>
-            <Text style={localStyles.rangeLabel}>범위</Text>
+          <View style={stylesNative.rangeSection}>
+            <Text style={stylesNative.rangeLabel}>범위</Text>
             <TextInput
-              style={localStyles.rangeInput}
+              style={stylesNative.rangeInput}
               value={radius.toString()}
               onChangeText={t => setRadius(Number(t) || radius)}
               keyboardType="numeric"
             />
-            <Text style={localStyles.rangeUnit}>m</Text>
+            <Text style={stylesNative.rangeUnit}>m</Text>
           </View>
 
           {/* ─────────── 포함 | 제외 ─────────── */}
-          <View style={localStyles.includeExcludeSection}>
-            <View style={localStyles.includeExcludeRow}>
-              <Text style={localStyles.includeExcludeLabel}>포함</Text>
+          <View style={stylesNative.includeExcludeSection}>
+            <View style={stylesNative.includeExcludeRow}>
+              <Text style={stylesNative.includeExcludeLabel}>포함</Text>
               <TextInput
-                style={localStyles.includeExcludeInput}
+                style={stylesNative.includeExcludeInput}
                 placeholder="포함 카테고리"
                 value={includedCategory}
                 onChangeText={setIncludedCategory}
               />
             </View>
-            <View style={localStyles.includeExcludeRow}>
-              <Text style={localStyles.includeExcludeLabel}>제외</Text>
+            <View style={stylesNative.includeExcludeRow}>
+              <Text style={stylesNative.includeExcludeLabel}>제외</Text>
               <TextInput
-                style={localStyles.includeExcludeInput}
+                style={stylesNative.includeExcludeInput}
                 placeholder="제외 카테고리"
                 value={excludedCategory}
                 onChangeText={setExcludedCategory}
@@ -488,14 +467,12 @@ function ExploreScreen({
           </View>
 
           {/* ─────────── 랜덤 추천 ─────────── */}
-          <View style={localStyles.spinSection}>
+          <View style={stylesNative.spinSection}>
             <TouchableOpacity
-              style={[commonStyles.commonButton, localStyles.spinButton]}
+              style={[styles.commonButton, stylesNative.spinButton]}
               onPress={handleSpin}
             >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                랜덤 추천
-              </Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>랜덤 추천</Text>
             </TouchableOpacity>
           </View>
 
@@ -514,10 +491,10 @@ function ExploreScreen({
 
         {/* ─────────── 리스트 토글 ─────────── */}
         <TouchableOpacity
-          style={localStyles.toggleWrapper}
+          style={stylesNative.toggleWrapper}
           onPress={() => setIsListOpen(v => !v)}
         >
-          <Text style={localStyles.toggleText}>
+          <Text style={stylesNative.toggleText}>
             {isListOpen ? '▲ 접기' : '▼ 펼치기'}
           </Text>
         </TouchableOpacity>
@@ -547,111 +524,7 @@ export default ExploreScreen;
 
 // 화면 전용 로컬 스타일
 const localStyles = StyleSheet.create({
-  // ─── 주소 검색 섹션 ───
-  searchSection: {
-    padding: 8,
-  },
-
-  // ─── 버튼 두 개를 가로 정렬하여 가운데 배치 ───
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  // 왼쪽: 검색 버튼
-  searchButton: {
-    flex: 1,
-    marginRight: 5, // 두 버튼 사이 5px 간격
-  },
-  // 오른쪽: 현위치 검색 버튼
-  locationButton: {
-    flex: 1,
-    marginLeft: 5, // 두 버튼 사이 5px 간격
-  },
-
-  // ─── 범위(Range) 섹션 ───
-  rangeSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-  rangeLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
-    color: '#333',
-    width: 40, // “범위” 텍스트 고정 너비
-  },
-  rangeInput: {
-    flex: 1,
-    backgroundColor: '#f4f4f4',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    height: 44,
-  },
-  rangeUnit: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#333',
-  },
-
-  // ─── 포함 | 제외 섹션 ───
-  includeExcludeSection: {
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-  includeExcludeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  includeExcludeLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    width: 40, // “포함”/“제외” 고정 너비
-    color: '#333',
-  },
-  includeExcludeInput: {
-    flex: 1,
-    backgroundColor: '#f4f4f4',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    height: 44,
-  },
-
-  // ─── 랜덤 추천 섹션 ───
-  spinSection: {
-    alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  spinButton: {
-    minWidth: 120,   // 현위치 검색 버튼과 동일 크기로 맞추려면  flex 대신 minWidth 사용
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: '#43A047',
-  },
-
-  // ─── 리스트 토글 ───
-  toggleWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    zIndex: 10,
-  },
-  toggleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
+  // (이 부분은 이미 stylesNative 안에 정의되어 있어 ExploreScreen에서는 사용하지 않습니다)
+  // ExploreScreen 전용 스타일은 이제 모두 stylesNative에서 관리합니다.
+  // 여기에는 더 이상 추가적으로 스타일을 두지 않아도 됩니다.
 });
