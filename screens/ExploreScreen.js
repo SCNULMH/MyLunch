@@ -17,6 +17,8 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import { signOut } from 'firebase/auth';           // ← 추가
+import { auth } from '../firebase';      
 import * as Location from 'expo-location';
 import MapComponent from '../components/MapComponent';
 import { Ionicons } from '@expo/vector-icons';
@@ -342,7 +344,10 @@ function ExploreScreen({
       <View style={styles.header}>
         <Text style={styles.headerTitle}>오늘 뭐 먹지?</Text>
         {user ? (
-          <TouchableOpacity style={styles.authButton} onPress={openLogin}>
+          <TouchableOpacity
+            style={styles.authButton}
+            onPress={() => signOut(auth)}   // ← 여기서 실제 로그아웃 호출
+          >
             <Text style={{ color: '#fff' }}>로그아웃</Text>
           </TouchableOpacity>
         ) : (
